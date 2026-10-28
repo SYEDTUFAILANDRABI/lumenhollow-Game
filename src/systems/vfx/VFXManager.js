@@ -10,6 +10,7 @@ export class VFXManager {
     this.shockwaves = [];
     this.lightningArcs = [];
     this.damageNumbers = new DamageNumbers();
+    this.glassCracks = [];
 
     // Screen flash
     this.flashColor = '#ffffff';
@@ -17,12 +18,23 @@ export class VFXManager {
     this.isMonochrome = false;
     this.monochromeTimer = 0;
 
+    // Aura Build-up & Red Sky
+    this.auraBuildUpProgress = 0;
+    this.redSkyAlpha = 0;
+
+    // Safety: Reduced effects
+    this.reducedEffects = false;
+
     // Zoom punch
     this.zoomScale = 1.0;
     this.targetZoom = 1.0;
   }
 
   triggerFlash(color = '#ffffff', duration = 0.12, monochrome = false) {
+    if (this.reducedEffects) {
+      this.flashAlpha = 0.25;
+      return;
+    }
     this.flashColor = color;
     this.flashAlpha = 0.85;
     if (monochrome) {
@@ -32,8 +44,36 @@ export class VFXManager {
   }
 
   triggerZoomPunch(scale = 1.12, duration = 0.15) {
-    this.zoomScale = scale;
+    this.zoomScale = this.reducedEffects ? Math.min(1.05, scale) : scale;
     this.targetZoom = 1.0;
+  }
+
+  addGlassShatter(centerX, centerY) {
+    const rays = [];
+    const count = 10;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+      const len = 400 + Math.random() * 250;
+      const points = [{ x: 0, y: 0 }];
+      const segments = 4;
+      for (let s = 1; s <= segments; s++) {
+        const segLen = (s / segments) * len;
+        const jitter = (Math.random() - 0.5) * 28;
+        points.push({
+          x: Math.cos(angle) * segLen - Math.sin(angle) * jitter,
+          y: Math.sin(angle) * segLen + Math.cos(angle) * jitter
+        });
+      }
+      rays.push(points);
+    }
+
+    this.glassCracks.push({
+      x: centerX,
+      y: centerY,
+      rays,
+      lifetime: 0.55,
+      maxLife: 0.55
+    });
   }
 
   addAfterimage(x, y, facing, drawCallback, color = 'rgba(162, 136, 227, 0.45)', lifetime = 0.28) {
@@ -147,6 +187,18 @@ export class VFXManager {
       if (la.dead) this.lightningArcs.splice(i, 1);
     }
 
+    // Glass cracks
+    for (let i = this.glassCracks.length - 1; i >= 0; i--) {
+      const gc = this.glassCracks[i];
+      gc.lifetime -= dt;
+      if (gc.lifetime <= 0) this.glassCracks.splice(i, 1);
+    }
+
+    // Red sky fade
+    if (this.redSkyAlpha > 0) {
+      this.redSkyAlpha = Math.max(0, this.redSkyAlpha - 1.2 * dt);
+    }
+
     // Damage numbers
     this.damageNumbers.update(dt);
   }
@@ -237,9 +289,57 @@ export class VFXManager {
   }
 
   renderScreenOverlay(ctx, width, height, flashIntensity = 1.0) {
+    // 1. Red Sky shift during Sovereign's Aura
+    if (this.redSkyAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = this.redSkyAlpha * 0.45;
+      ctx.fillStyle = '#ff1133';
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // 2. Aura Build-up tightening dark-red vignette
+    if (this.auraBuildUpProgress > 0) {
+      ctx.save();
+      const p = this.auraBuildUpProgress;
+      const grad = ctx.createRadialGradient(
+        width / 2, height / 2, Math.max(10, (1 - p * 0.65) * (width * 0.45)),
+        width / 2, height / 2, width * 0.65
+      );
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.7, `rgba(120, 10, 30, ${p * 0.65})`);
+      grad.addColorStop(1, `rgba(40, 0, 10, ${p * 0.95})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // 3. Glass Cracks Shatter Effect across the screen
+    for (const gc of this.glassCracks) {
+      const p = gc.lifetime / gc.maxLife;
+      ctx.save();
+      ctx.translate(gc.x, gc.y);
+      ctx.globalAlpha = Math.min(1, p * 1.6);
+      ctx.strokeStyle = '#ffffff';
+      ctx.shadowColor = '#ff2255';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 1.8;
+
+      for (const ray of gc.rays) {
+        ctx.beginPath();
+        for (let i = 0; i < ray.length; i++) {
+          if (i === 0) ctx.moveTo(ray[i].x, ray[i].y);
+          else ctx.lineTo(ray[i].x, ray[i].y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 4. Screen Flash
     if (this.flashAlpha > 0 && flashIntensity > 0) {
       ctx.save();
-      ctx.globalAlpha = this.flashAlpha * flashIntensity;
+      ctx.globalAlpha = this.flashAlpha * (this.reducedEffects ? 0.35 : flashIntensity);
       ctx.fillStyle = this.flashColor;
       ctx.fillRect(0, 0, width, height);
       ctx.restore();

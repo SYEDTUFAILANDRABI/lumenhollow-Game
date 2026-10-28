@@ -63,10 +63,11 @@ export class MenuOverlay {
     ctx.globalAlpha = 1.0;
 
     // Controls Legend
-    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    ctx.fillStyle = 'rgba(244, 241, 255, 0.7)';
-    ctx.fillText('Move: [A / D] • Jump: [Space] • Slash: [J] • Bolt: [L] • Dash: [C] • Plunge: [S in Air]', centerX, centerY + 95);
-    ctx.fillText('Pulse: [Shift] • Sovereign Aura: [Q] (at 100% Eclipse) • Mute: [M] • Pause: [Esc]', centerX, centerY + 115);
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = 'rgba(244, 241, 255, 0.75)';
+    ctx.fillText('Move: [A/D] • Jump/Double-Jump/Glide: [Space] • Wall Slide/Jump: [Wall+Space] • Dash: [C]', centerX, centerY + 85);
+    ctx.fillText('Slash: [J] • Skills: [U, I, O] • Underworld Summons: [E / 1-5] • Sovereign Aura: [Hold Q]', centerX, centerY + 102);
+    ctx.fillText('Skills Menu: [Tab] • Live Tuning: [F2] • Mute: [M] • Pause: [Esc]', centerX, centerY + 119);
 
     ctx.restore();
   }
@@ -104,16 +105,17 @@ export class MenuOverlay {
     const hitStopText = accessibility.hitStopEnabled !== false ? 'ON' : 'OFF';
     const dmgText = accessibility.damageNumbers !== false ? 'ON' : 'OFF';
     const qualityText = accessibility.highQuality !== false ? 'HIGH (60 FPS)' : 'LOW (BATTERY)';
+    const reducedText = accessibility.reducedEffects ? 'ON (SAFE)' : 'OFF';
 
     ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.fillStyle = '#f4f1ff';
     ctx.fillText(`[1] Screen Shake: ${shakeText}     [2] Flash Intensity: ${flashText}`, centerX, optY);
-    ctx.fillText(`[3] Hit-Stop Juice: ${hitStopText}     [4] Damage Numbers: ${dmgText}`, centerX, optY + 20);
-    ctx.fillText(`[5] Graphics Quality: ${qualityText}`, centerX, optY + 40);
+    ctx.fillText(`[3] Hit-Stop Juice: ${hitStopText}     [4] Damage Numbers: ${dmgText}`, centerX, optY + 18);
+    ctx.fillText(`[5] Graphics Quality: ${qualityText}     [6] Reduced Effects: ${reducedText}`, centerX, optY + 36);
 
     ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.fillStyle = 'rgba(244, 241, 255, 0.5)';
-    ctx.fillText('Press number keys 1-5 to toggle options', centerX, optY + 65);
+    ctx.fillText('Press number keys 1-6 to toggle options • [Tab] Opens Skills Menu', centerX, optY + 58);
 
     ctx.restore();
   }

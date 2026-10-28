@@ -1,83 +1,107 @@
-<<<<<<< HEAD
-# Lumen Hollow: Eclipse & Sovereign's Aura Edition
+# Lumen Hollow: Underworld & Sovereign Edition
 
-> *The moon has shattered into five shards that fell into the Hollow Wood. A hooded wanderer named Lumi carries the last lantern and must journey through whispering groves, crystal caverns, and starlit sky ruins to battle the void, defeat the Eclipse Warden, and return the shards to the Moon Shrine.*
-
----
-
-## ⚔️ Combat System & Moves
-
-| Move | Key | Mobile Touch | Description |
-| :--- | :--- | :--- | :--- |
-| **Move** | `A` / `D` or `Arrow Keys` | `◀` / `▶` | Run with procedural cloak sway & footstep dust puffs. |
-| **Jump** | `Space` / `W` / `Up` | `▲` | Variable jump height, 100ms Coyote Time, 120ms jump buffer. |
-| **Lantern Pulse** | `Shift` (Left/Right) / `K` | `☼` | Expands light radius to 220px, reveals moon-glass platforms, stuns wisps. |
-| **Lantern Slash** | `J` | `⚔️` | 3-hit combo sequence with crescent slash trails. Hit 3 unleashes a shockwave. |
-| **Umbral Bolt** | `L` | `⚡` | Fires a piercing dark violet projectile leaving a ribbon trail. |
-| **Shadow Dash** | `C` or `Left Ctrl` | `💨` | Invulnerable dash leaving afterimages; marks enemies with delayed cuts. |
-| **Void Plunge** | `S` or `Down` (in Air) | `▼` | Downward slam creating crater fissures, dark spikes, and a shockwave. |
-| **Parry** | `J` (on attack impact) | `⚔️` | Timing slash as an enemy attacks triggers a gold flash, slow-motion, and stagger. |
-| **Sovereign's Aura** | `Q` (at 100% Eclipse) | `👑` | Ultimate anime-inspired willpower burst. Disintegrates weak foes into ash. |
-| **Pause & Options**| `Escape` or `P` | — | Pause menu with accessibility toggles (`1`-`5`). |
-| **Respawn** | `R` | — | Safe checkpoint respawn. |
-| **Mute Audio** | `M` | — | Procedural Web Audio mute toggle. |
+> *The moon has shattered into five shards that fell into the Hollow Wood. A hooded wanderer named Lumi carries the last lantern and must journey through whispering groves, crystal caverns, and starlit sky ruins to battle the void, defeat the Eclipse Warden, summon underworld creatures, and return the shards to the Moon Shrine.*
 
 ---
 
-## 👑 Sovereign's Aura & Eclipse Form
+## 🎮 Complete Controls Guide
 
-- **Eclipse Meter**: Fills by landing hits (+5), scoring kills (+15), executing parries (+25), and building combos.
-- **Sovereign's Aura Activation (`Q`)**:
-  - Time slows for 150ms.
-  - Camera zoom-in punch followed by screen shake.
-  - Brief black-and-white high-contrast flash.
-  - Black-and-crimson branching lightning arcs along ground, walls, and Lumi.
-  - Expanding chromatic shockwave and spreading ground fissures.
-  - **Willpower Check**:
-    - **Low Will (Shadow Wisps)**: Freeze, turn grey, and dissolve into ash.
-    - **Medium Will (Knights, Crow Wraiths)**: Staggered for 1.6s and knocked back.
-    - **High Will (Eclipse Warden Boss)**: Stunned for 0.9s.
-- **Eclipse Form (8–12 seconds)**:
-  - Lantern turns vibrant violet and crimson.
-  - Cloak sheds trailing embers, eyes glow scarlet.
-  - Attacks deal +35% damage, have 1.45x wider reach, and move faster.
-  - Lumi leaves a dark trailing afterimage.
-
----
-
-## 👹 Enemy Types & Mini-Boss
-
-1. **Combat Dummy**: Stationed in the Level 1 Training Glade to practice slash combos, bolts, dashes, plunges, and parries.
-2. **Shadow Wisp**: Ethereal floaters with low will (20); flee in light and dissolve into ash upon receiving Sovereign's Aura.
-3. **Hollow Knight**: Heavy armored guardians with high damage. Telegraphed overhead slash can be parried right before it lands.
-4. **Crow Wraith**: Avian shadows that hover, emit a warning screech, and swoop down in an arc.
-5. **Mini-Boss "Eclipse Warden"** (Summit of Sky Ruins):
-   - **Phase 1**: Fires slow homing Umbral Orbs.
-   - **Phase 2**: Triple-bolt void dart barrages and faster movement.
-   - **Phase 3**: Screen-wide jump & ground slam creating rolling shockwaves and dark spikes that must be jumped or dashed through.
-   - Defeating the Warden unlocks the gate to the Level 4 Moon Shrine!
+| Category | Action | Keyboard | Touch / Mobile | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Movement** | Run | `A` / `D` or `←` / `→` | `◀` / `▶` | Snappy ground acceleration & air control |
+| | Jump / Double Jump | `Space` / `W` / `↑` | `▲` | 6+ tiles high single jump, double jump burst |
+| | Firefly Glide | Hold `Space` in air | `▲` (hold) | Slow graceful glide descent with firefly glow |
+| | Wall Slide & Jump | Push into wall + `Space` | Wall + `▲` | Cling, slide down walls, and kick off diagonally |
+| | Fast-Fall | Hold `S` / `↓` in air | `▼` (in air) | Rapid descent cap at 620px/s |
+| **Core Combat** | Lantern Slash | `J` | `⚔️` | 3-hit combo; hit 3 unleashes shockwave |
+| | Shadow Dash | `C` or `Left Ctrl` | `💨` | Invulnerable dash; resets on ground, wall touch, or kill |
+| | Lantern Pulse | `Shift` or `K` | `☼` | Expands light radius, reveals moon-glass, stuns wisps |
+| | Void Plunge | `S` or `↓` (in air) | `▼` | Downward slam creating crater and dark spikes |
+| | Parry | `J` on impact | `⚔️` | Gold flash, slow-mo stagger, bonus Eclipse meter |
+| **Sovereign's Aura** | Goosebumps Ultimate | Hold `Q` (at 100% Eclipse) | `👑` (hold) | 0.7s charge build-up, screen-wide branching lightning & boom |
+| **Summoning** | Summon Wheel | `E` (hold / press) | `💀` | Slows time to 10%; radial wheel selection |
+| | Quick Summons | `1`, `2`, `3`, `4`, `5` | `💀` | Instantly calls creatures using Soul Energy |
+| **Swappable Skills** | Skill Slots 1, 2, 3 | `U`, `I`, `O` | `U`, `I`, `O` | Casts equipped abilities from current loadout preset |
+| | Skills & Presets Menu | `Tab` | `📋` | Open skill swap menu to assign abilities & switch presets |
+| **Debug & System** | Live Physics Tuning | `F2` | — | Real-time sliders for gravity, jump force, dash, speed |
+| | Pause & Settings | `Esc` or `P` | — | Pause menu with 6 accessibility/performance toggles |
+| | Safe Respawn | `R` | — | Instant respawn at last lit shrine |
+| | Mute Audio | `M` | — | Toggle Web Audio procedural synthesizer |
 
 ---
 
-## 💎 Shard Upgrades
+## 👑 Sovereign's Aura (Goosebumps Upgrade)
 
-Each collected Moon Shard permanently enhances Lumi's arsenal:
-- **Shard 1 (Grove)**: Wider Lantern Slash reach (+30% range).
-- **Shard 2 (Caverns)**: Umbral Bolt gains infinite pierce through all enemies.
-- **Shard 3 (Sky Ruins #1)**: Extended Shadow Dash distance and invulnerability.
-- **Shard 4 (Sky Ruins #2)**: Extended Eclipse Form duration (8s ➔ 12s).
-- **Shard 5 (Moon Shrine)**: Sovereign's Aura radius & damage increased by 50%.
+- **Range**: Covers the entire screen and beyond (**1.5× screen diagonal ≈ 1150px**), affecting all enemies in the section.
+- **Build-Up (0.7s hold `Q`)**:
+  - Music fades and muffles through a low-pass biquad filter.
+  - Deep rhythmic procedural heartbeat begins (`58Hz ➔ 28Hz`).
+  - Lumi's lantern flickers violently; ground trembles with pre-shake.
+  - Leaves, dust pebbles, and crimson embers float upward against gravity.
+  - Vignette tightens and screen borders turn dark red.
+- **Release Explosion**:
+  - **100ms freeze-frame** with inverted black-and-white flash and fast zoom punch.
+  - Time dilates to **30% for 400ms**.
+  - **16-ray recursive midpoint displacement lightning** strikes across the entire screen and crawls along walls and ground.
+  - Concentric chromatic shockwave rings and a full-screen **glass-shatter crack overlay**.
+  - Sky and parallax layers tint to deep dark crimson.
+  - **180ms silence cut** followed by a colossal **40Hz sub-bass boom** with 1.8s decay, noise crackle, detuned dark choir pad, and high tinnitus ringing.
+- **Willpower Check**:
+  - **Low Will (Shadow Wisps)**: Freeze, turn grey, fall, and dissolve into souls.
+  - **Medium Will (Hollow Knights, Crow Wraiths)**: Forced to their knees in a trembling cower state for 2.2s.
+  - **High Will (Eclipse Warden Boss)**: Staggered and stunned briefly.
+  - **Active Summons**: Roar and receive a +40% damage boost for 6 seconds.
+- **Mobile & Safety**:
+  - Mobile haptic vibration via `navigator.vibrate([80, 50, 150, 50, 250])`.
+  - **Reduced Effects Toggle** (`[6]` in Pause Menu) removes strobe flashes and limits intensity.
 
 ---
 
-## ♿ Accessibility & Performance Toggles
+## 💀 Underworld Summoning System
 
-Accessible in the Pause Menu (`Esc`):
-- `[1]` **Screen Shake**: On / Off
-- `[2]` **Flash Intensity**: 100% / 50% / Off
-- `[3]` **Hit-Stop Juice**: On / Off
-- `[4]` **Damage Numbers**: On / Off
-- `[5]` **Graphics Quality**: High (60 FPS) / Low (Battery Saver)
+Lumi can harvest **Soul Energy** (up to 100) dropped from defeated enemies to summon 5 procedural Canvas-drawn creatures:
+1. **Tri-Maw (Cost: 20)**: Three-headed hellhound with animated jaws, fast rushing leaps, and vicious biting attacks.
+2. **Ashen Wyrm (Cost: 25)**: Skeletal bone dragon with sinuous flying body segments that swoops and breathes dark violet fire.
+3. **Hollow Reaper (Cost: 30)**: Tall cloaked death knight wielding a giant curved scythe with sweeping cleaves.
+4. **Abyss Titan (Cost: 35)**: Colossal horned shadow titan rising from ground fissures to slam massive fists into the earth.
+5. **Skeleton Legion (Cost: 25)**: Squad of 5 small animated skeleton warriors swarming and stabbing enemies.
+
+**Rules**:
+- Up to 2 summons active at once.
+- Each lasts 12–14 seconds before dissolving into souls.
+- Summons automatically acquire and target enemies.
+- Deals 35% damage to the boss so the mini-boss encounter remains balanced and engaging.
+
+---
+
+## ⚡ Swappable Skills & 3 Loadout Presets
+
+Press `Tab` (or open from Pause Menu) to view the Skills Screen:
+- **3 Swappable Slots**: Assigned to `U`, `I`, `O`.
+- **7 Unique Abilities**:
+  1. `Umbral Bolt`: Piercing dark violet projectile with ribbon trail.
+  2. `Void Plunge`: Downward slam causing crater fissures and spikes.
+  3. `Crescent Wave`: Wide crescent energy arc cutting across the room.
+  4. `Soul Chain`: Pulls distant enemies toward Lumi and stuns them.
+  5. `Gravity Well`: Spawns a swirling vortex pulling nearby enemies together.
+  6. `Shadow Clone`: Decoy afterimage drawing enemy attacks away from Lumi.
+  7. `Spirit Lance`: Instant radiant violet beam piercing straight through enemies.
+- **3 Presets**: Easily switch between preset loadouts, automatically persisted in `localStorage`.
+
+---
+
+## 🛠️ Live Physics Tuning Panel (`F2`)
+
+Press `F2` at any time to open the live in-game tuning panel with real-time sliders for:
+- Jump Power (`JUMP_FORCE`)
+- Double Jump Power (`DOUBLE_JUMP_FORCE`)
+- Rising Gravity (`GRAVITY_UP`)
+- Falling Gravity (`GRAVITY_DOWN`)
+- Run Speed (`MOVE_SPEED`)
+- Firefly Glide Speed (`GLIDE_FALL_SPEED`)
+- Wall Slide Speed (`WALL_SLIDE_SPEED`)
+- Shadow Dash Speed (`DASH_SPEED`)
+- Ground Friction / Deceleration (`DECELERATION`)
 
 ---
 
@@ -93,12 +117,11 @@ npm run dev
 
 Open [http://localhost:5173/](http://localhost:5173/) to play.
 
-### Automated Test Suite
+### Automated Testing Suite
 ```bash
-node tests/verify_combat_game.js
+# Verify jump physics, reachability, aura, summons, skills, and boss fight
+node tests/verify_upgrade_game.js
+
+# Verify platform reachability simulation across all levels
+node tests/reachability_audit.js
 ```
-Runs a complete headless Chrome test verifying movement, combat combos, boss phases, and zero console errors.
-=======
-# lumenhollow-Game
-Game
->>>>>>> a865cd84d01e764874658f9252853afbe361cff0

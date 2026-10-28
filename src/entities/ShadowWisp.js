@@ -21,6 +21,8 @@ export class ShadowWisp {
     this.faintingAura = false;
     this.deathTimer = 0;
     this.hitFlashTimer = 0;
+    this.rotation = 0;
+    this.spinSpeed = 0;
 
     this.timer = Math.random() * 20;
     this.tailPoints = [];
@@ -73,7 +75,10 @@ export class ShadowWisp {
   die(combatSystem, vfx, particleSystem, audioSystem, camera) {
     if (this.isDead) return;
     this.isDead = true;
-    this.deathTimer = 0.35;
+    this.deathTimer = 0.55;
+    this.spinSpeed = (Math.random() - 0.5) * 16;
+    this.vx = (Math.random() - 0.5) * 140;
+    this.vy = -Math.random() * 90 - 70;
     if (combatSystem) {
       combatSystem.registerKill(this.x, this.y, vfx, audioSystem, camera);
     }
@@ -84,7 +89,12 @@ export class ShadowWisp {
 
     if (this.isDead) {
       this.deathTimer -= dt;
-      this.currentScale = Math.max(0, this.currentScale - 2.5 * dt);
+      this.rotation += this.spinSpeed * dt;
+      this.vy += 420 * dt;
+      this.vx *= Math.pow(0.95, dt * 60);
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.currentScale = Math.max(0, this.currentScale - 1.8 * dt);
       return;
     }
 
@@ -180,6 +190,7 @@ export class ShadowWisp {
 
     ctx.save();
     ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
     ctx.scale(this.currentScale, this.currentScale);
 
     // Ghostly trailing wisps

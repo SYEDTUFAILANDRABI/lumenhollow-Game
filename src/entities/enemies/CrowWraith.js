@@ -24,6 +24,8 @@ export class CrowWraith {
     this.wingTimer = Math.random() * 10;
     this.swoopTargetX = 0;
     this.swoopTargetY = 0;
+    this.rotation = 0;
+    this.spinSpeed = 0;
   }
 
   getHurtbox() {
@@ -64,7 +66,10 @@ export class CrowWraith {
   die(combatSystem, vfx, particleSystem, audioSystem, camera) {
     if (this.isDead) return;
     this.isDead = true;
-    this.deathTimer = 0.35;
+    this.deathTimer = 0.5;
+    this.spinSpeed = (Math.random() - 0.5) * 14;
+    this.vx = (Math.random() - 0.5) * 150;
+    this.vy = -160;
     if (combatSystem) {
       combatSystem.registerKill(this.x, this.y, vfx, audioSystem, camera);
     }
@@ -75,7 +80,9 @@ export class CrowWraith {
 
     if (this.isDead) {
       this.deathTimer -= dt;
-      this.vy += 400 * dt;
+      this.rotation += this.spinSpeed * dt;
+      this.vy += 500 * dt;
+      this.vx *= Math.pow(0.96, dt * 60);
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       return;
@@ -174,6 +181,7 @@ export class CrowWraith {
 
     ctx.save();
     ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
     ctx.scale(this.facing, 1);
 
     if (this.hitFlashTimer > 0) {

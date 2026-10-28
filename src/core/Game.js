@@ -17,6 +17,9 @@ import { HUD } from '../ui/HUD.js';
 import { MenuOverlay } from '../ui/MenuOverlay.js';
 import { CombatSystem } from '../systems/combat/CombatSystem.js';
 import { VFXManager } from '../systems/vfx/VFXManager.js';
+import { TuningPanel } from '../debug/TuningPanel.js';
+import { SummonSystem } from '../systems/summons/SummonSystem.js';
+import { SkillSystem } from '../systems/skills/SkillSystem.js';
 
 export const GAME_STATES = {
   MENU: 'MENU',
@@ -50,6 +53,10 @@ export class Game {
     this.menuOverlay = new MenuOverlay();
     this.combat = new CombatSystem();
     this.vfx = new VFXManager();
+    this.tuningPanel = new TuningPanel();
+    this.summons = new SummonSystem();
+    this.skills = new SkillSystem();
+    this.combat.summonSystem = this.summons;
 
     // Game state
     this.state = GAME_STATES.MENU;
@@ -234,6 +241,7 @@ export class Game {
 
   update(dt) {
     this.input.update(dt);
+    if (this.tuningPanel) this.tuningPanel.update(this.input);
 
     if (this.input.actions.muteJustPressed) {
       this.audio.toggleMute();
@@ -305,6 +313,14 @@ export class Game {
       this.accessibility.highQuality = !this.accessibility.highQuality;
       Storage.save(this.accessibility);
     }
+    if (this.input.justPressed.has('Digit6')) {
+      this.accessibility.reducedEffects = !this.accessibility.reducedEffects;
+      this.vfx.reducedEffects = this.accessibility.reducedEffects;
+      Storage.save(this.accessibility);
+    }
+    if (this.input.actions.skillsJustPressed) {
+      this.skills.menuOpen = !this.skills.menuOpen;
+    }
   }
 
   updatePlaying(dt) {
@@ -330,8 +346,37 @@ export class Game {
       return;
     }
 
-    // Apply Time Dilation (slow-mo)
-    const effectiveDt = dt * this.combat.timeDilation;
+    // Apply Time Dilation (slow-mo) + Menu slow-mo
+    const menuSlow = (this.summons.wheelOpen || this.skills.menuOpen) ? 0.12 : 1.0;
+    const effectiveDt = dt * this.combat.timeDilation * menuSlow;
+
+    // Update Underworld Summons
+    this.summons.update(
+      effectiveDt,
+      this.player,
+      this.tileMap.getAllEnemies(),
+      this.tileMap.boss,
+      this.combat,
+      this.vfx,
+      this.audio,
+      this.camera,
+      this.particles,
+      this.input
+    );
+
+    // Update Swappable Skills
+    this.skills.update(
+      effectiveDt,
+      this.input,
+      this.player,
+      this.combat,
+      this.tileMap.getAllEnemies(),
+      this.tileMap.boss,
+      this.vfx,
+      this.audio,
+      this.camera,
+      this.particles
+    );
 
     // Update Combat System
     this.combat.update(
@@ -496,6 +541,10 @@ export class Game {
       // 5. Combat Projectiles & Soul Orbs
       this.combat.render(ctx);
 
+      // 5b. Underworld Summons & Swappable Skills in World Space
+      this.summons.renderWorld(ctx);
+      this.skills.renderWorld(ctx);
+
       // 6. Player & Firefly Companion
       this.player.render(ctx);
       this.firefly.render(ctx);
@@ -550,8 +599,13 @@ export class Game {
         5,
         this.audio.isMuted,
         this.combat,
-        this.tileMap.boss
+        this.tileMap.boss,
+        this.skills
       );
+
+      // 12b. Summon Wheel & Skills Screen Overlays
+      this.summons.renderWheel(ctx, GAME_WIDTH, GAME_HEIGHT, this.combat.soulEnergy);
+      this.skills.renderMenu(ctx, GAME_WIDTH, GAME_HEIGHT);
     }
 
     // 13. Overlay Screens

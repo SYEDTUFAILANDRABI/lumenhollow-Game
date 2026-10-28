@@ -28,6 +28,8 @@ export class HollowKnight {
     this.attackDuration = 0.22;
     this.recoveryDuration = 0.70;
     this.attackActive = false;
+    this.rotation = 0;
+    this.spinSpeed = 0;
   }
 
   getHurtbox() {
@@ -69,8 +71,11 @@ export class HollowKnight {
   die(combatSystem, vfx, particleSystem, audioSystem, camera) {
     if (this.isDead) return;
     this.isDead = true;
-    this.deathTimer = 0.45;
+    this.deathTimer = 0.55;
     this.attackActive = false;
+    this.spinSpeed = (Math.random() - 0.5) * 12;
+    this.vx = (Math.random() - 0.5) * 140;
+    this.vy = -180;
     if (combatSystem) {
       combatSystem.registerKill(this.x, this.y - this.height / 2, vfx, audioSystem, camera);
     }
@@ -81,7 +86,10 @@ export class HollowKnight {
 
     if (this.isDead) {
       this.deathTimer -= dt;
-      this.vy += 600 * dt;
+      this.rotation += this.spinSpeed * dt;
+      this.vy += 650 * dt;
+      this.vx *= Math.pow(0.96, dt * 60);
+      this.x += this.vx * dt;
       this.y += this.vy * dt;
       return;
     }
@@ -194,6 +202,7 @@ export class HollowKnight {
 
     ctx.save();
     ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
     ctx.scale(this.facing, 1);
 
     if (this.hitFlashTimer > 0) {

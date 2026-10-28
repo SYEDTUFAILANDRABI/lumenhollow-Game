@@ -17,31 +17,44 @@ export class LightningEffect {
 
   generateSegments() {
     this.segments = [];
-    const dx = this.targetX - this.startX;
-    const dy = this.targetY - this.startY;
+    this.subdivide(this.startX, this.startY, this.targetX, this.targetY, 4, 35);
+  }
+
+  subdivide(x1, y1, x2, y2, depth, maxDisplacement) {
+    if (depth <= 0) {
+      this.segments.push({ x1, y1, x2, y2 });
+      return;
+    }
+
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
     const dist = Math.hypot(dx, dy);
-    const steps = Math.max(3, Math.floor(dist / 14));
 
-    let prevX = this.startX;
-    let prevY = this.startY;
+    if (dist < 4) {
+      this.segments.push({ x1, y1, x2, y2 });
+      return;
+    }
 
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      let nx = this.startX + dx * t;
-      let ny = this.startY + dy * t;
+    // Normal vector displacement
+    const perpX = -dy / dist;
+    const perpY = dx / dist;
+    const disp = (Math.random() - 0.5) * maxDisplacement;
 
-      if (i < steps) {
-        // Normal vector displacement
-        const perpX = -dy / dist;
-        const perpY = dx / dist;
-        const jitter = (Math.random() - 0.5) * 18;
-        nx += perpX * jitter;
-        ny += perpY * jitter;
-      }
+    const nx = midX + perpX * disp;
+    const ny = midY + perpY * disp;
 
-      this.segments.push({ x1: prevX, y1: prevY, x2: nx, y2: ny });
-      prevX = nx;
-      prevY = ny;
+    this.subdivide(x1, y1, nx, ny, depth - 1, maxDisplacement * 0.55);
+    this.subdivide(nx, ny, x2, y2, depth - 1, maxDisplacement * 0.55);
+
+    // Branching probability for anime-style crawler bolts
+    if (depth >= 2 && Math.random() < 0.45) {
+      const branchAngle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+      const branchLen = dist * (0.35 + Math.random() * 0.35);
+      const bx = nx + Math.cos(branchAngle) * branchLen;
+      const by = ny + Math.sin(branchAngle) * branchLen;
+      this.subdivide(nx, ny, bx, by, depth - 2, maxDisplacement * 0.4);
     }
   }
 

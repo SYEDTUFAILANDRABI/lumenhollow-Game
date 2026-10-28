@@ -20,7 +20,7 @@ export class HUD {
     }
   }
 
-  render(ctx, player, currentLevelIndex, foundShards, totalShards = 5, isMuted = false, combatSystem = null, boss = null) {
+  render(ctx, player, currentLevelIndex, foundShards, totalShards = 5, isMuted = false, combatSystem = null, boss = null, skillSystem = null) {
     ctx.save();
 
     // 1. Lantern Energy Bar (Top Left)
@@ -90,18 +90,54 @@ export class HUD {
         ctx.fillRect(barX + 1, eBarY + 1, (barWidth - 2) * eclipseRatio, 4);
       }
 
-      // Ready banner
-      if (isReady) {
+      // Ready banner or Charging Bar
+      if (player.isChargingAura) {
+        const cRatio = Math.min(1, player.auraChargeTimer / 0.70);
+        ctx.fillStyle = '#ff2255';
+        ctx.font = 'bold 9px -apple-system, sans-serif';
+        ctx.fillText(`CHARGING AURA [${Math.round(cRatio * 100)}%]`, barX + barWidth + 6, eBarY + 6);
+      } else if (isReady) {
         const pulse = Math.sin(Date.now() * 0.008) > 0;
         if (pulse) {
           ctx.font = 'bold 9px -apple-system, sans-serif';
           ctx.fillStyle = '#ffd98a';
-          ctx.fillText('AURA READY [Q]', barX + barWidth + 6, eBarY + 6);
+          ctx.fillText('AURA READY [HOLD Q]', barX + barWidth + 6, eBarY + 6);
         }
       } else if (inEclipse) {
         ctx.font = 'bold 9px -apple-system, sans-serif';
         ctx.fillStyle = '#ff2255';
         ctx.fillText('ECLIPSE FORM', barX + barWidth + 6, eBarY + 6);
+      }
+
+      // 1c. Soul Energy Bar (Below Eclipse Meter)
+      const sBarY = eBarY + 10;
+      const soulRatio = Math.max(0, Math.min(1, (combatSystem.soulEnergy || 0) / (combatSystem.maxSoulEnergy || 100)));
+
+      // Soul Icon (mini skull / flame)
+      ctx.fillStyle = '#ff2255';
+      ctx.beginPath();
+      ctx.arc(barX - 7, sBarY + 3.5, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Soul Frame
+      ctx.strokeStyle = 'rgba(255, 34, 85, 0.4)';
+      ctx.strokeRect(barX, sBarY, barWidth, 6);
+      ctx.fillStyle = 'rgba(14, 8, 20, 0.8)';
+      ctx.fillRect(barX, sBarY, barWidth, 6);
+
+      // Soul Fill
+      if (soulRatio > 0) {
+        const sGrad = ctx.createLinearGradient(barX, sBarY, barX + barWidth * soulRatio, sBarY);
+        sGrad.addColorStop(0, '#551133');
+        sGrad.addColorStop(1, '#ff2255');
+        ctx.fillStyle = sGrad;
+        ctx.fillRect(barX + 1, sBarY + 1, (barWidth - 2) * soulRatio, 4);
+      }
+
+      if ((combatSystem.soulEnergy || 0) >= 20) {
+        ctx.font = 'bold 9px -apple-system, sans-serif';
+        ctx.fillStyle = '#f4f1ff';
+        ctx.fillText('SUMMONS [E]', barX + barWidth + 6, sBarY + 6);
       }
     }
 
@@ -246,6 +282,50 @@ export class HUD {
       ctx.fillText(this.subtitleText, GAME_WIDTH / 2, GAME_HEIGHT * 0.35 + 22);
 
       ctx.restore();
+    }
+
+    // 5. Swappable Skill Slots UI (Bottom Left corner)
+    if (skillSystem) {
+      const slotKeys = ['U', 'I', 'O'];
+      const startX = 20;
+      const startY = GAME_HEIGHT - 32;
+
+      ctx.font = '9px -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(162, 136, 227, 0.7)';
+      ctx.textAlign = 'left';
+      ctx.fillText('[TAB] SKILLS', startX, startY - 5);
+
+      for (let s = 0; s < 3; s++) {
+        const slotX = startX + s * 34;
+        const skillId = skillSystem.assignedSlots[s];
+        const skill = skillSystem.getSkill(skillId);
+        const cd = skillSystem.cooldowns[s];
+        const cdRatio = skill ? Math.min(1, cd / skill.cooldown) : 0;
+
+        ctx.fillStyle = cd > 0 ? 'rgba(15, 10, 25, 0.7)' : 'rgba(28, 18, 48, 0.85)';
+        ctx.strokeStyle = cd > 0 ? 'rgba(255, 34, 85, 0.4)' : '#ffd98a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(slotX, startY, 28, 22, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Icon
+        ctx.textAlign = 'center';
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.fillText(skill.icon, slotX + 14, startY + 12);
+
+        // Key label
+        ctx.font = 'bold 8px monospace';
+        ctx.fillStyle = cd > 0 ? '#ff8fab' : '#ffd98a';
+        ctx.fillText(slotKeys[s], slotX + 14, startY + 20);
+
+        // Cooldown sweep overlay
+        if (cdRatio > 0) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+          ctx.fillRect(slotX, startY, 28, 22 * cdRatio);
+        }
+      }
     }
 
     ctx.restore();

@@ -18,9 +18,22 @@ export class Input {
       dashJustPressed: false,
       plungeJustPressed: false,
       auraJustPressed: false,
+      auraHold: false,
       pauseJustPressed: false,
       muteJustPressed: false,
-      interactJustPressed: false
+      interactJustPressed: false,
+      f2JustPressed: false,
+      skillsJustPressed: false,
+      summonJustPressed: false,
+      summonHold: false,
+      summonQuick1: false,
+      summonQuick2: false,
+      summonQuick3: false,
+      summonQuick4: false,
+      summonQuick5: false,
+      skillSlot1: false,
+      skillSlot2: false,
+      skillSlot3: false
     };
 
     // Buffer tracking
@@ -32,8 +45,8 @@ export class Input {
 
   setupKeyboardListeners() {
     window.addEventListener('keydown', (e) => {
-      // Prevent scrolling for game controls
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS'].includes(e.code)) {
+      // Prevent scrolling / defaults for game controls
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'Tab', 'F2'].includes(e.code)) {
         e.preventDefault();
       }
 
@@ -109,7 +122,12 @@ export class Input {
     bindTouch('btn-bolt', () => { this.touchBoltJustPressed = true; }, () => {});
     bindTouch('btn-dash', () => { this.touchDashJustPressed = true; }, () => {});
     bindTouch('btn-plunge', () => { this.touchPlungeJustPressed = true; }, () => {});
-    bindTouch('btn-aura', () => { this.touchAuraJustPressed = true; }, () => {});
+    bindTouch('btn-aura', () => { this.touchAuraJustPressed = true; this.touchAuraHold = true; }, () => { this.touchAuraHold = false; });
+    bindTouch('btn-summon', () => { this.touchSummonJustPressed = true; }, () => {});
+    bindTouch('btn-skills', () => { this.touchSkillsJustPressed = true; }, () => {});
+    bindTouch('btn-skill-1', () => { this.touchSkill1JustPressed = true; }, () => {});
+    bindTouch('btn-skill-2', () => { this.touchSkill2JustPressed = true; }, () => {});
+    bindTouch('btn-skill-3', () => { this.touchSkill3JustPressed = true; }, () => {});
   }
 
   update(dt) {
@@ -131,16 +149,33 @@ export class Input {
 
     const pulse = k('ShiftLeft') || k('ShiftRight') || k('KeyK') || !!this.touchPulse;
 
-    // Combat moves
+    // Combat moves & Aura
     const slashJustPressed = jp('KeyJ') || !!this.touchSlashJustPressed;
     const boltJustPressed = jp('KeyL') || !!this.touchBoltJustPressed;
     const dashJustPressed = jp('KeyC') || jp('ControlLeft') || jp('ControlRight') || !!this.touchDashJustPressed;
     const plungeJustPressed = (down && jp('KeyS')) || (down && jp('ArrowDown')) || !!this.touchPlungeJustPressed;
     const auraJustPressed = jp('KeyQ') || !!this.touchAuraJustPressed;
+    const auraHold = k('KeyQ') || !!this.touchAuraHold;
 
     const pauseJustPressed = jp('Escape') || jp('KeyP');
     const muteJustPressed = jp('KeyM');
     const interactJustPressed = jp('KeyE') || jp('Enter');
+    const f2JustPressed = jp('F2');
+    const skillsJustPressed = jp('Tab') || !!this.touchSkillsJustPressed;
+
+    // Summoning
+    const summonJustPressed = jp('KeyE') || !!this.touchSummonJustPressed;
+    const summonHold = k('KeyE');
+    const summonQuick1 = jp('Digit1');
+    const summonQuick2 = jp('Digit2');
+    const summonQuick3 = jp('Digit3');
+    const summonQuick4 = jp('Digit4');
+    const summonQuick5 = jp('Digit5');
+
+    // Swappable skills (U, I, O)
+    const skillSlot1 = jp('KeyU') || !!this.touchSkill1JustPressed;
+    const skillSlot2 = jp('KeyI') || !!this.touchSkill2JustPressed;
+    const skillSlot3 = jp('KeyO') || !!this.touchSkill3JustPressed;
 
     this.actions = {
       left,
@@ -155,9 +190,22 @@ export class Input {
       dashJustPressed,
       plungeJustPressed,
       auraJustPressed,
+      auraHold,
       pauseJustPressed,
       muteJustPressed,
-      interactJustPressed
+      interactJustPressed,
+      f2JustPressed,
+      skillsJustPressed,
+      summonJustPressed,
+      summonHold,
+      summonQuick1,
+      summonQuick2,
+      summonQuick3,
+      summonQuick4,
+      summonQuick5,
+      skillSlot1,
+      skillSlot2,
+      skillSlot3
     };
 
     // Clear frame-specific sets
@@ -170,6 +218,11 @@ export class Input {
     this.touchDashJustPressed = false;
     this.touchPlungeJustPressed = false;
     this.touchAuraJustPressed = false;
+    this.touchSummonJustPressed = false;
+    this.touchSkillsJustPressed = false;
+    this.touchSkill1JustPressed = false;
+    this.touchSkill2JustPressed = false;
+    this.touchSkill3JustPressed = false;
   }
 
   hasBufferedJump() {

@@ -8,6 +8,10 @@ export class CombatSystem {
     this.isEclipseForm = false;
     this.eclipseFormTimer = 0;
 
+    // Soul Energy Resource for Underworld Summons
+    this.soulEnergy = 40;
+    this.maxSoulEnergy = 100;
+
     // Combo system
     this.comboCount = 0;
     this.comboTimer = 0;
@@ -36,6 +40,10 @@ export class CombatSystem {
   addEclipseMeter(amount) {
     if (this.isEclipseForm) return; // Cannot recharge while in Eclipse Form
     this.eclipseMeter = Math.min(this.maxEclipseMeter, this.eclipseMeter + amount);
+  }
+
+  addSoulEnergy(amount) {
+    this.soulEnergy = Math.min(this.maxSoulEnergy, this.soulEnergy + amount);
   }
 
   isAuraReady() {
@@ -155,6 +163,8 @@ export class CombatSystem {
 
       if (dist < 14 || orb.lifetime <= 0) {
         player.rechargeEnergy(orb.energyValue);
+        player.airDashAvailable = true;
+        this.addSoulEnergy(14);
         if (particles) particles.emitFireflyAbsorb(orb.x, orb.y);
         this.soulOrbs.splice(i, 1);
         continue;
@@ -219,7 +229,7 @@ export class CombatSystem {
     }
   }
 
-  triggerSovereignAura(player, enemies, boss, vfx, particles, audio, camera, shardUpgrades = {}) {
+  triggerSovereignAura(player, enemies, boss, vfx, particles, audio, camera, shardUpgrades = {}, chargeTime = 0.7) {
     this.eclipseMeter = 0;
     this.isEclipseForm = true;
     const baseDuration = COMBAT.ECLIPSE.DURATION;
@@ -227,37 +237,56 @@ export class CombatSystem {
     this.eclipseFormTimer = shardUpgrades[3] ? baseDuration * 1.5 : baseDuration;
     player.enterEclipseForm(this.eclipseFormTimer);
 
-    // Audio effects: deep sub-bass boom, heartbeat thump, rising celestial tone
+    // Audio effects: 150ms silence drop, huge 40Hz sub-bass boom, lightning noise crackle, detuned choir, tinnitus ringing
     if (audio) {
       audio.playSovereignAura();
     }
 
-    // Time slows for 150ms
+    // Time slows to 30% for 400ms
     this.triggerSlowMo(COMBAT.ECLIPSE.AURA_SLOWMO_DURATION, COMBAT.ECLIPSE.AURA_SLOWMO_SCALE);
 
-    // Camera zoom punch + hard shake
+    // Camera zoom punch + hard cinematic shake
     if (camera) {
-      camera.shake(9, 0.45);
+      camera.shake(14, 0.65);
     }
+
+    const px = player.x + player.width / 2;
+    const py = player.y + player.height / 2;
+
+    // Calculate dynamic range: base 1150px (covers 1.5x screen diagonal), scaled by charge and moon shards
+    const shardBonus = Object.values(shardUpgrades).filter(Boolean).length * 0.12;
+    const chargeRatio = Math.max(0.6, Math.min(1.4, chargeTime / 0.7));
+    const auraRadius = COMBAT.ECLIPSE.AURA_RADIUS * (1 + shardBonus) * chargeRatio;
+    const auraDmg = COMBAT.ECLIPSE.AURA_DAMAGE * (1 + shardBonus * 0.5);
+
     if (vfx) {
-      vfx.triggerZoomPunch(1.15, 0.18);
-      // Screen briefly flashes black & white
-      vfx.triggerFlash('#ffffff', 0.22, true);
-      // Large expanding shockwave ring
-      const radius = shardUpgrades[4] ? COMBAT.ECLIPSE.AURA_RADIUS * 1.5 : COMBAT.ECLIPSE.AURA_RADIUS;
-      vfx.addShockwave(player.x + player.width / 2, player.y + player.height / 2, radius, 0.65, '#ff2255', true);
-      // Black-and-crimson lightning crackles
-      vfx.addLightningBurst(player.x + player.width / 2, player.y + player.height / 2, 10, radius);
-      // Spreading ground cracks
-      vfx.addGroundCrack(player.x + player.width / 2, player.y + player.height, 45, 3.5);
+      vfx.triggerZoomPunch(1.22, 0.22);
+      // 100ms freeze frame inverted black & white flash
+      vfx.triggerFlash('#ffffff', 0.25, true);
+      vfx.redSkyAlpha = 1.0;
+
+      // Concentric expanding shockwave rings with chromatic aberration
+      vfx.addShockwave(px, py, auraRadius * 0.6, 0.50, '#ff2255', true);
+      vfx.addShockwave(px, py, auraRadius * 0.9, 0.65, '#ffd98a', true);
+      vfx.addShockwave(px, py, auraRadius, 0.85, '#ff2255', true);
+
+      // Procedural branching lightning crawling across the screen
+      vfx.addLightningBurst(px, py, 16, auraRadius);
+
+      // Spreading ground cracks & sky glass fracture overlay
+      vfx.addGroundCrack(px, player.y + player.height, 65, 4.5);
+      vfx.addGlassShatter(px, py);
+    }
+
+    // Empower active summons if any
+    if (this.summonSystem && this.summonSystem.activeSummons) {
+      for (const s of this.summonSystem.activeSummons) {
+        s.buffTimer = 6.0;
+        if (s.roar) s.roar();
+      }
     }
 
     // Willpower check on all enemies in range
-    const px = player.x + player.width / 2;
-    const py = player.y + player.height / 2;
-    const auraRadius = shardUpgrades[4] ? COMBAT.ECLIPSE.AURA_RADIUS * 1.5 : COMBAT.ECLIPSE.AURA_RADIUS;
-    const auraDmg = shardUpgrades[4] ? COMBAT.ECLIPSE.AURA_DAMAGE * 1.4 : COMBAT.ECLIPSE.AURA_DAMAGE;
-
     const allTargets = [...enemies];
     if (boss && !boss.isDead) allTargets.push(boss);
 
@@ -265,23 +294,23 @@ export class CombatSystem {
       if (target.isDead) continue;
       const dist = Math.hypot(target.x - px, target.y - py);
       if (dist <= auraRadius) {
-        // Check Willpower
         const will = target.will || 50;
 
         if (will <= 25) {
           // Low will (Wisps): freeze, turn grey, dissolve into ash
           target.dieToAura(this, vfx, particles, audio, camera);
         } else if (will <= 70) {
-          // Medium will (Knights, Crow Wraiths): heavily staggered & pushed back
+          // Medium will (Knights, Crow Wraiths): forced to knees & trembling
           const pushAngle = Math.atan2(target.y - py, target.x - px);
-          target.applyStun(1.6);
+          target.applyStun(2.2);
+          target.state = 'COWER';
           target.takeDamage(auraDmg, target.x, target.y, this, vfx, audio, camera);
-          target.vx = Math.cos(pushAngle) * 180;
-          target.vy = Math.sin(pushAngle) * 120 - 40;
+          target.vx = Math.cos(pushAngle) * 220;
+          target.vy = Math.sin(pushAngle) * 140 - 50;
         } else {
-          // Boss: briefly stunned
-          target.applyStun(0.9);
-          target.takeDamage(auraDmg * 0.7, target.x, target.y, this, vfx, audio, camera);
+          // Boss: briefly staggered
+          target.applyStun(1.1);
+          target.takeDamage(auraDmg * 0.65, target.x, target.y, this, vfx, audio, camera);
         }
       }
     }

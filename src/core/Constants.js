@@ -18,16 +18,36 @@ export const COLORS = {
 };
 
 export const PHYSICS = {
-  GRAVITY: 850,
-  MAX_FALL_SPEED: 420,
-  MOVE_SPEED: 135,
-  ACCELERATION: 950,
-  DECELERATION: 1100,
-  AIR_DECELERATION: 500,
-  JUMP_FORCE: -310,
-  JUMP_CUT_MULTIPLIER: 0.45,
-  COYOTE_TIME: 0.1,        // 100 ms
-  JUMP_BUFFER_TIME: 0.12   // 120 ms
+  // Asymmetric Gravity & Jump Tuning
+  GRAVITY_UP: 620,             // Lower gravity while rising for floaty, responsive ascent
+  GRAVITY_DOWN: 1020,          // Stronger gravity while falling for snappy descent
+  APEX_HANG_VELOCITY: 45,      // Velocity threshold considered "apex / top of jump"
+  APEX_HANG_GRAVITY_MULT: 0.38,// Significant hang time at the apex
+  MAX_FALL_SPEED: 460,         // Terminal velocity
+  FAST_FALL_SPEED: 620,        // Max fall speed when holding down
+
+  MOVE_SPEED: 145,             // Base run speed (~7 tiles horizontal distance across jump)
+  ACCELERATION: 1100,          // Snappy ground acceleration
+  DECELERATION: 1300,          // Responsive ground stopping
+  AIR_ACCELERATION: 850,       // Good responsive air control
+  AIR_DECELERATION: 400,       // Low friction in air
+
+  JUMP_FORCE: -385,            // 1st jump clears 4+ tiles vertically (~85px)
+  DOUBLE_JUMP_FORCE: -340,     // Double jump for extra verticality and recovery
+  JUMP_CUT_MULTIPLIER: 0.42,   // Variable jump height cut on early release
+  COYOTE_TIME: 0.12,           // 120 ms
+  JUMP_BUFFER_TIME: 0.12,      // 120 ms
+
+  // Firefly Glide & Wall Mechanics
+  GLIDE_FALL_SPEED: 65,        // Slow, controlled glide descent
+  GLIDE_GRAVITY: 85,           // Gentle gravity while holding jump in air
+  WALL_SLIDE_SPEED: 70,        // Cling and slow slide down walls
+  WALL_JUMP_FORCE_X: 230,      // Horizontal impulse away from wall
+  WALL_JUMP_FORCE_Y: -360,     // Vertical pop up from wall jump
+
+  // Dash & Knockback
+  DASH_SPEED: 380,
+  DASH_DURATION: 0.22
 };
 
 export const LANTERN = {

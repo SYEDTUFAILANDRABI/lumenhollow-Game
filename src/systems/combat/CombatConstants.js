@@ -44,10 +44,11 @@ export const COMBAT = {
     HIT_GAIN: 5,
     KILL_GAIN: 15,
     COMBO_STEP_GAIN: 1.5,
-    AURA_RADIUS: 220,
-    AURA_DAMAGE: 45,
-    AURA_SLOWMO_DURATION: 0.20,
-    AURA_SLOWMO_SCALE: 0.10,
+    AURA_RADIUS: 1150,       // 1.5x screen diagonal covers entire screen and beyond
+    AURA_CHARGE_TIME: 0.70,  // 0.7 seconds dramatic hold-to-charge build-up
+    AURA_DAMAGE: 55,
+    AURA_SLOWMO_DURATION: 0.40,
+    AURA_SLOWMO_SCALE: 0.30,
     FORM_DAMAGE_MULT: 1.35,
     FORM_SPEED_MULT: 1.20,
     FORM_SLASH_SCALE: 1.45

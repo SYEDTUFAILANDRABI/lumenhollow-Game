@@ -1,5 +1,6 @@
 import { TILE_SIZE, COLORS } from '../core/Constants.js';
 import { MoonGlassPlatform } from '../entities/MoonGlassPlatform.js';
+import { MovingPlatform } from '../entities/MovingPlatform.js';
 import { Shrine } from '../entities/Shrine.js';
 import { MoonShard } from '../entities/MoonShard.js';
 import { ShadowWisp } from '../entities/ShadowWisp.js';
@@ -31,6 +32,7 @@ export class TileMap {
     this.boss = null;
     this.fireflies = [];
     this.moonGlassPlatforms = [];
+    this.movingPlatforms = [];
     this.hazards = [];
 
     // Parse map grid
@@ -80,6 +82,9 @@ export class TileMap {
         } else if (char === 'M') {
           this.moonGlassPlatforms.push(new MoonGlassPlatform(px, py, TILE_SIZE, 10));
           row.push('M');
+        } else if (char === '~') {
+          this.movingPlatforms.push(new MovingPlatform(px, py, 48, 10, 60, 0, 1.4));
+          row.push(' ');
         } else if (char === '^') {
           this.hazards.push({ x: px, y: py + 8, width: TILE_SIZE, height: 12 });
           row.push('^');
@@ -101,6 +106,16 @@ export class TileMap {
     return this.grid[r][c];
   }
 
+  getTileAtPixel(px, py) {
+    const c = Math.floor(px / TILE_SIZE);
+    const r = Math.floor(py / TILE_SIZE);
+    const tile = this.getTile(c, r);
+    return {
+      char: tile,
+      solid: tile === '#'
+    };
+  }
+
   getAllEnemies() {
     return [...this.wisps, ...this.dummies, ...this.knights, ...this.crows];
   }
@@ -110,6 +125,20 @@ export class TileMap {
     const lPos = player.getLanternWorldPos();
     for (const mg of this.moonGlassPlatforms) {
       mg.update(player.currentLightRadius, lPos, dt);
+    }
+
+    // 1b. Moving platforms carrying player
+    for (const mp of this.movingPlatforms) {
+      mp.update(dt);
+      if (mp.checkPlayerStanding(player)) {
+        player.y = mp.y - player.height;
+        player.x += mp.deltaX;
+        player.y += mp.deltaY;
+        player.isGrounded = true;
+        player.vy = 0;
+        player.canDoubleJump = true;
+        player.airDashAvailable = true;
+      }
     }
 
     // 2. Shrines
@@ -268,6 +297,14 @@ export class TileMap {
       if (mg.x + mg.width >= bounds.left && mg.x <= bounds.right &&
           mg.y + mg.height >= bounds.top && mg.y <= bounds.bottom) {
         mg.render(ctx);
+      }
+    }
+
+    // Render moving platforms
+    for (const mp of this.movingPlatforms) {
+      if (mp.x + mp.width >= bounds.left && mp.x <= bounds.right &&
+          mp.y + mp.height >= bounds.top && mp.y <= bounds.bottom) {
+        mp.render(ctx);
       }
     }
 

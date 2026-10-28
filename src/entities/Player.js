@@ -44,6 +44,18 @@ export class Player {
     this.deathTimer = 0;
     this.invulnerableTimer = 0;
 
+    // Jump & Physics extensions
+    this.canDoubleJump = true;
+    this.isGliding = false;
+    this.isWallSliding = false;
+    this.wallDir = 0;
+    this.airDashAvailable = true;
+    this.isFastFalling = false;
+
+    // Aura charging state
+    this.isChargingAura = false;
+    this.auraChargeTimer = 0;
+
     // Movement lock for transitions/cutscenes
     this.frozen = false;
 
@@ -84,6 +96,12 @@ export class Player {
     this.scaleX = 0.6;
     this.scaleY = 1.4;
     this.energy = LANTERN.MAX_ENERGY;
+    this.canDoubleJump = true;
+    this.isGliding = false;
+    this.isWallSliding = false;
+    this.airDashAvailable = true;
+    this.isFastFalling = false;
+    this.isChargingAura = false;
     this.isSlashing = false;
     this.isDashing = false;
     this.isPlunging = false;
@@ -165,9 +183,42 @@ export class Player {
       }
     }
 
-    // --- Combat Input: Sovereign's Aura (Q) ---
-    if (input.actions.auraJustPressed && combatSystem && combatSystem.isAuraReady()) {
-      combatSystem.triggerSovereignAura(this, enemies, boss, vfx, particleSystem, audioSystem, camera, shardUpgrades);
+    // --- Combat Input: Sovereign's Aura (Hold Q for Goosebumps build-up) ---
+    if ((input.actions.auraHold || input.actions.auraJustPressed) && combatSystem && combatSystem.isAuraReady()) {
+      if (!this.isChargingAura) {
+        this.isChargingAura = true;
+        this.auraChargeTimer = 0;
+        if (audioSystem) audioSystem.playAuraBuildUp();
+      }
+      this.auraChargeTimer += dt;
+
+      // Build-up feedback: upward debris/leaves, camera trembling, lantern flicker
+      if (camera) camera.shake(1.4, 0.05);
+      if (particleSystem) particleSystem.emitAuraChargeParticles(this.x + this.width / 2, this.y + this.height, 70);
+      this.lanternAngle += (Math.random() - 0.5) * 0.45;
+      if (vfx) vfx.auraBuildUpProgress = Math.min(1, this.auraChargeTimer / COMBAT.ECLIPSE.AURA_CHARGE_TIME);
+
+      // Heartbeat pulse at 0.35s
+      if (Math.abs(this.auraChargeTimer - 0.35) < dt && audioSystem) {
+        audioSystem.playHeartbeat(0.5);
+      }
+
+      // Check if fully charged: automatically release the goosebumps explosion!
+      if (this.auraChargeTimer >= COMBAT.ECLIPSE.AURA_CHARGE_TIME) {
+        combatSystem.triggerSovereignAura(this, enemies, boss, vfx, particleSystem, audioSystem, camera, shardUpgrades, this.auraChargeTimer);
+        this.isChargingAura = false;
+        this.auraChargeTimer = 0;
+        if (vfx) vfx.auraBuildUpProgress = 0;
+      }
+    } else if (this.isChargingAura) {
+      // Released Q: if charged enough or pressed, trigger aura!
+      if (this.auraChargeTimer >= 0.20 && combatSystem && combatSystem.isAuraReady()) {
+        combatSystem.triggerSovereignAura(this, enemies, boss, vfx, particleSystem, audioSystem, camera, shardUpgrades, this.auraChargeTimer);
+      }
+      this.isChargingAura = false;
+      this.auraChargeTimer = 0;
+      if (vfx) vfx.auraBuildUpProgress = 0;
+      if (audioSystem) audioSystem.setMuffle(false);
     }
 
     // --- Combat Input: Lantern Slash (J) ---
@@ -275,7 +326,7 @@ export class Player {
       if (moveDir !== 0) {
         this.facing = moveDir;
         const targetSpeed = moveDir * PHYSICS.MOVE_SPEED * speedMult;
-        const accel = this.isGrounded ? PHYSICS.ACCELERATION : PHYSICS.ACCELERATION * 0.75;
+        const accel = this.isGrounded ? PHYSICS.ACCELERATION : PHYSICS.AIR_ACCELERATION;
         this.vx += (targetSpeed - this.vx) * Math.min(1, accel * dt / PHYSICS.MOVE_SPEED);
       } else {
         const decel = this.isGrounded ? PHYSICS.DECELERATION : PHYSICS.AIR_DECELERATION;
@@ -286,41 +337,131 @@ export class Player {
         }
       }
 
+      // Check for wall slide against solid tiles in air
+      this.isWallSliding = false;
+      this.wallDir = 0;
+      if (!this.isGrounded && this.vy > 0 && moveDir !== 0) {
+        const testX = moveDir > 0 ? this.x + this.width + 2 : this.x - 2;
+        const checkTileTop = tileMap.getTileAtPixel ? tileMap.getTileAtPixel(testX, this.y + 4) : null;
+        const checkTileBottom = tileMap.getTileAtPixel ? tileMap.getTileAtPixel(testX, this.y + this.height - 4) : null;
+        const isWall = (checkTileTop && checkTileTop.solid) || (checkTileBottom && checkTileBottom.solid);
+        if (isWall) {
+          this.isWallSliding = true;
+          this.wallDir = moveDir;
+          this.canDoubleJump = true;
+          this.airDashAvailable = true;
+          if (this.vy > PHYSICS.WALL_SLIDE_SPEED) {
+            this.vy = PHYSICS.WALL_SLIDE_SPEED;
+          }
+          if (particleSystem && Math.random() < 0.25) {
+            particleSystem.emitWallSlideSparks(this.x + (this.wallDir > 0 ? this.width : 0), this.y + this.height * 0.5, this.wallDir);
+          }
+        }
+      }
+
       // Ground & Coyote Time
       if (this.isGrounded) {
         this.coyoteTimer = PHYSICS.COYOTE_TIME;
         this.isJumping = false;
+        this.canDoubleJump = true;
+        this.airDashAvailable = true;
+        this.isGliding = false;
       } else {
         this.coyoteTimer = Math.max(0, this.coyoteTimer - dt);
       }
 
-      // Jump Handling
-      const canJump = (this.isGrounded || this.coyoteTimer > 0) && !this.isJumping && !this.isPlunging;
-      if (input.hasBufferedJump() && canJump) {
-        input.consumeBufferedJump();
-        this.vy = PHYSICS.JUMP_FORCE;
-        this.isGrounded = false;
-        this.coyoteTimer = 0;
-        this.isJumping = true;
-        this.scaleX = 0.78;
-        this.scaleY = 1.32;
+      // Jump Handling: Ground jump, Wall jump, Double jump
+      const canNormalJump = (this.isGrounded || this.coyoteTimer > 0) && !this.isJumping && !this.isPlunging;
 
-        if (audioSystem) audioSystem.playJump();
-        if (particleSystem) {
-          particleSystem.emitJumpPuff(this.x + this.width / 2, this.y + this.height);
+      if (input.hasBufferedJump()) {
+        if (this.isWallSliding) {
+          // Wall Jump: horizontal kick away from wall + vertical rise
+          input.consumeBufferedJump();
+          this.vx = -this.wallDir * PHYSICS.WALL_JUMP_FORCE_X;
+          this.vy = PHYSICS.WALL_JUMP_FORCE_Y;
+          this.facing = -this.wallDir;
+          this.isWallSliding = false;
+          this.isGrounded = false;
+          this.canDoubleJump = true;
+          this.airDashAvailable = true;
+          this.scaleX = 0.75;
+          this.scaleY = 1.35;
+          if (audioSystem) audioSystem.playJump();
+          if (particleSystem) {
+            particleSystem.emitJumpPuff(this.x + this.width / 2, this.y + this.height / 2);
+          }
+        } else if (canNormalJump) {
+          // Normal Ground Jump
+          input.consumeBufferedJump();
+          this.vy = PHYSICS.JUMP_FORCE;
+          this.isGrounded = false;
+          this.coyoteTimer = 0;
+          this.isJumping = true;
+          this.canDoubleJump = true;
+          this.scaleX = 0.78;
+          this.scaleY = 1.32;
+          if (audioSystem) audioSystem.playJump();
+          if (particleSystem) {
+            particleSystem.emitJumpPuff(this.x + this.width / 2, this.y + this.height);
+          }
+        } else if (this.canDoubleJump && !this.isPlunging) {
+          // Double Jump in mid-air
+          input.consumeBufferedJump();
+          this.vy = PHYSICS.DOUBLE_JUMP_FORCE;
+          this.canDoubleJump = false;
+          this.airDashAvailable = true;
+          this.scaleX = 0.8;
+          this.scaleY = 1.35;
+          if (audioSystem) audioSystem.playJump();
+          if (particleSystem) {
+            particleSystem.emitDoubleJumpBurst(this.x + this.width / 2, this.y + this.height);
+          }
         }
       }
 
-      // Variable jump height cut
+      // Variable jump height cut on release
       if (input.actions.jumpJustReleased && this.vy < 0 && !this.isPlunging) {
         this.vy *= PHYSICS.JUMP_CUT_MULTIPLIER;
       }
 
-      // Gravity
-      if (!this.isPlunging) {
-        this.vy += PHYSICS.GRAVITY * dt;
-        if (this.vy > PHYSICS.MAX_FALL_SPEED) {
-          this.vy = PHYSICS.MAX_FALL_SPEED;
+      // Firefly Glide: hold jump while falling in air
+      if (!this.isGrounded && !this.isWallSliding && this.vy > 20 && input.actions.jump && !this.isPlunging && !this.isDashing) {
+        this.isGliding = true;
+        if (this.vy > PHYSICS.GLIDE_FALL_SPEED) {
+          this.vy = Math.max(PHYSICS.GLIDE_FALL_SPEED, this.vy - 380 * dt);
+        }
+        if (particleSystem && Math.random() < 0.25) {
+          particleSystem.emitFireflyGlint(this.x + this.width / 2, this.y - 4);
+        }
+      } else {
+        this.isGliding = false;
+      }
+
+      // Fast-Fall option: holding down while falling
+      const wantsFastFall = (input.actions.down || (input.keys && (input.keys.get('KeyS') || input.keys.get('ArrowDown')))) && !this.isGrounded && this.vy > 0 && !this.isPlunging;
+
+      // Asymmetric Gravity & Apex Hang
+      if (!this.isPlunging && !this.isWallSliding) {
+        if (this.isGliding) {
+          this.vy += PHYSICS.GLIDE_GRAVITY * dt;
+          if (this.vy > PHYSICS.GLIDE_FALL_SPEED) this.vy = PHYSICS.GLIDE_FALL_SPEED;
+        } else if (this.vy < 0) {
+          // Rising: lower gravity + apex hang at crest
+          let grav = PHYSICS.GRAVITY_UP;
+          if (Math.abs(this.vy) < PHYSICS.APEX_HANG_VELOCITY) {
+            grav *= PHYSICS.APEX_HANG_GRAVITY_MULT;
+          }
+          this.vy += grav * dt;
+        } else {
+          // Falling: stronger gravity + fast-fall option
+          let grav = PHYSICS.GRAVITY_DOWN;
+          if (wantsFastFall) {
+            this.vy += grav * 1.45 * dt;
+            if (this.vy > PHYSICS.FAST_FALL_SPEED) this.vy = PHYSICS.FAST_FALL_SPEED;
+          } else {
+            this.vy += grav * dt;
+            if (this.vy > PHYSICS.MAX_FALL_SPEED) this.vy = PHYSICS.MAX_FALL_SPEED;
+          }
         }
       }
     }
@@ -468,6 +609,10 @@ export class Player {
   }
 
   initiateDash(vfx, audioSystem, shardUpgrades) {
+    if (!this.isGrounded && !this.isWallSliding) {
+      if (!this.airDashAvailable) return;
+      this.airDashAvailable = false;
+    }
     this.isDashing = true;
     const duration = shardUpgrades[2] ? COMBAT.DASH.DURATION * 1.3 : COMBAT.DASH.DURATION;
     this.dashTimer = duration;

@@ -17,8 +17,17 @@ export class FireflyCompanion {
     this.timer += dt;
 
     // Follow target hovering behind/above Lumi depending on facing
-    const hoverOffsetX = player.facing === 1 ? -16 : 16;
-    const hoverOffsetY = -16;
+    let hoverOffsetX = player.facing === 1 ? -16 : 16;
+    let hoverOffsetY = -16;
+
+    if (player.isGliding) {
+      // Hover directly above Lumi like an ethereal parachute / beacon
+      hoverOffsetX = 0;
+      hoverOffsetY = -22;
+      this.lightRadius = 64;
+    } else {
+      this.lightRadius = 38;
+    }
 
     // Gentle floating figure-8 flutter
     const floatX = Math.sin(this.timer * 2.8) * 8;
@@ -31,7 +40,7 @@ export class FireflyCompanion {
     const dx = this.targetX - this.x;
     const dy = this.targetY - this.y;
 
-    const springStrength = 6.5;
+    const springStrength = player.isGliding ? 12 : 6.5;
     this.vx += dx * springStrength * dt;
     this.vy += dy * springStrength * dt;
 
@@ -43,11 +52,12 @@ export class FireflyCompanion {
     this.y += this.vy * dt;
 
     // Rapid wing flap
-    this.wingAngle = Math.sin(this.timer * 28);
+    this.wingAngle = Math.sin(this.timer * (player.isGliding ? 42 : 28));
 
     // Subtle spark trail
     this.sparkleTimer += dt;
-    if (this.sparkleTimer > 0.22 && particleSystem) {
+    const sparkInterval = player.isGliding ? 0.08 : 0.22;
+    if (this.sparkleTimer > sparkInterval && particleSystem) {
       this.sparkleTimer = 0;
       particleSystem.emitFireflyGlint(this.x, this.y);
     }

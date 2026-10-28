@@ -17,7 +17,7 @@ class Particle {
     this.type = 'circle'; // 'circle', 'spark', 'dust'
   }
 
-  init(x, y, vx, vy, size, life, color, gravity = 0, drag = 0.98, type = 'circle') {
+  init(x, y, vx, vy, size, life, color, gravity = 0, drag = 0.98, type = 'circle', bounces = 0) {
     this.x = x;
     this.y = y;
     this.vx = vx;
@@ -29,10 +29,11 @@ class Particle {
     this.gravity = gravity;
     this.drag = drag;
     this.type = type;
+    this.bounces = bounces;
     this.active = true;
   }
 
-  update(dt) {
+  update(dt, tileMap = null) {
     if (!this.active) return;
     this.life -= dt;
     if (this.life <= 0) {
@@ -43,6 +44,18 @@ class Particle {
     this.vy += this.gravity * dt;
     this.vx *= Math.pow(this.drag, dt * 60);
     this.vy *= Math.pow(this.drag, dt * 60);
+
+    const nextX = this.x + this.vx * dt;
+    const nextY = this.y + this.vy * dt;
+
+    if (this.bounces > 0 && tileMap) {
+      const tile = tileMap.getTileAtPixel ? tileMap.getTileAtPixel(nextX, nextY) : null;
+      if (tile && tile.solid) {
+        this.vy = -this.vy * 0.52;
+        this.vx *= 0.7;
+        this.bounces--;
+      }
+    }
 
     this.x += this.vx * dt;
     this.y += this.vy * dt;
@@ -88,7 +101,7 @@ export class ParticleSystem {
     return null;
   }
 
-  update(dt, camera) {
+  update(dt, camera, tileMap = null) {
     // Ambient floating forest pollen/spores around visible camera area
     this.ambientTimer += dt;
     if (this.ambientTimer > 0.08) {
@@ -110,7 +123,7 @@ export class ParticleSystem {
     }
 
     for (let i = 0; i < this.pool.length; i++) {
-      this.pool[i].update(dt);
+      this.pool[i].update(dt, tileMap);
     }
   }
 
@@ -280,6 +293,67 @@ export class ParticleSystem {
         (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20,
         Math.random() * 2.5 + 1, 0.5,
         '#1b1a3a', 0, 0.92, 'circle'
+      );
+    }
+  }
+
+  emitDoubleJumpBurst(x, y) {
+    for (let i = 0; i < 12; i++) {
+      const p = this.getFreeParticle();
+      if (!p) break;
+      const angle = Math.PI * 0.1 + Math.random() * Math.PI * 0.8; // Burst downward
+      const speed = Math.random() * 55 + 25;
+      p.init(
+        x + (Math.random() - 0.5) * 10, y,
+        Math.cos(angle) * speed, Math.sin(angle) * speed * 0.7,
+        Math.random() * 2.5 + 1.2, 0.45,
+        Math.random() > 0.4 ? '#f4f1ff' : '#ffd98a',
+        60, 0.92, 'spark', 1
+      );
+    }
+  }
+
+  emitWallSlideSparks(x, y, dir) {
+    const p = this.getFreeParticle();
+    if (!p) return;
+    p.init(
+      x + dir * 6, y + (Math.random() - 0.5) * 6,
+      -dir * (Math.random() * 15 + 5), -Math.random() * 10 - 2,
+      Math.random() * 2 + 1, 0.35,
+      '#ffd98a', 40, 0.90, 'spark', 1
+    );
+  }
+
+  emitAuraChargeParticles(x, y, radius = 90) {
+    for (let i = 0; i < 3; i++) {
+      const p = this.getFreeParticle();
+      if (!p) break;
+      const px = x + (Math.random() - 0.5) * radius * 1.8;
+      const py = y + 10 + Math.random() * 25;
+      // Floats upward like dust, leaves, dark crimson embers
+      const colors = ['#ff2255', '#a288e3', '#ffd98a', '#3d2c6b'];
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      p.init(
+        px, py,
+        (Math.random() - 0.5) * 20, -Math.random() * 45 - 25,
+        Math.random() * 2.5 + 1.5, 0.7,
+        c, -45, 0.96, 'spark'
+      );
+    }
+  }
+
+  emitSummonRuneEmbers(x, y, radius = 40) {
+    for (let i = 0; i < 4; i++) {
+      const p = this.getFreeParticle();
+      if (!p) break;
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * radius;
+      p.init(
+        x + Math.cos(angle) * r, y + Math.sin(angle) * (r * 0.4),
+        (Math.random() - 0.5) * 15, -Math.random() * 40 - 15,
+        Math.random() * 2.5 + 1.2, 0.65,
+        Math.random() > 0.5 ? '#ff2255' : '#a288e3',
+        -25, 0.94, 'spark'
       );
     }
   }
