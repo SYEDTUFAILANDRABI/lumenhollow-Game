@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Lumen Hollow: Eclipse & Sovereign's Aura Edition
 
 > *The moon has shattered into five shards that fell into the Hollow Wood. A hooded wanderer named Lumi carries the last lantern and must journey through whispering groves, crystal caverns, and starlit sky ruins to battle the void, defeat the Eclipse Warden, and return the shards to the Moon Shrine.*
@@ -97,3 +98,7 @@ Open [http://localhost:5173/](http://localhost:5173/) to play.
 node tests/verify_combat_game.js
 ```
 Runs a complete headless Chrome test verifying movement, combat combos, boss phases, and zero console errors.
+=======
+# lumenhollow-Game
+Game
+>>>>>>> a865cd84d01e764874658f9252853afbe361cff0
