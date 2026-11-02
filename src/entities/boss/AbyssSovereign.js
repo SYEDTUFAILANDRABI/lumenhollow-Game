@@ -1,6 +1,7 @@
 // AbyssSovereign.js - Nythrax, Sovereign of the Abyss (Final Lower Realm Boss)
 import { COMBAT } from '../../systems/combat/CombatConstants.js';
 import { FireImp, HornedBrute } from '../enemies/Demons.js';
+import { SorcererBossSprite } from './SorcererBossSprite.js';
 
 export class AbyssSovereign {
   constructor(x, y) {
@@ -44,6 +45,7 @@ export class AbyssSovereign {
     this.chains = []; // { x, y, height, life }
     this.lavaCracks = [];
     this.minions = [];
+    this.sprite = new SorcererBossSprite();
   }
 
   getHurtbox() {
@@ -123,6 +125,7 @@ export class AbyssSovereign {
   update(player, combatSystem, vfx, particles, audio, camera, dt) {
     this.animTimer += dt;
     if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+    if (this.sprite) this.sprite.update(dt, this);
 
     if (!this.introDone) {
       this.introTimer -= dt;
@@ -241,6 +244,24 @@ export class AbyssSovereign {
     // Render minions
     for (const m of this.minions) {
       m.render(ctx, camera);
+    }
+
+    // Render with custom Sorcerer Boss Sprite
+    const drewSprite = this.sprite && this.sprite.render(ctx, rx, ry, this.facing, this.hitFlashTimer, 0.55);
+    if (drewSprite) {
+      // Draw Phase 4 Astral Barrier / Shield over sprite if phase 4
+      if (this.phase === 4) {
+        ctx.save();
+        ctx.strokeStyle = '#bb44ff';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#c1121f';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.arc(rx, ry - 38, 48, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      return;
     }
 
     ctx.save();

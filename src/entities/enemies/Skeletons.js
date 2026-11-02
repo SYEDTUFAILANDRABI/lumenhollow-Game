@@ -1,6 +1,7 @@
 // Skeletons.js - Skeleton Warrior, Archer, and Bone Knight
 import { COMBAT } from '../../systems/combat/CombatConstants.js';
 import { Projectile } from '../../systems/combat/Projectile.js';
+import { SkeletonSprite } from './SkeletonSprite.js';
 
 export class SkeletonWarrior {
   constructor(x, y, isUprising = false) {
@@ -41,6 +42,7 @@ export class SkeletonWarrior {
 
     this.rotation = 0;
     this.spinSpeed = 0;
+    this.sprite = new SkeletonSprite();
   }
 
   getHurtbox() {
@@ -101,6 +103,7 @@ export class SkeletonWarrior {
   update(player, combatSystem, vfx, particles, audio, camera, dt) {
     this.animTimer += dt;
     if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+    if (this.sprite) this.sprite.update(dt, this);
 
     if (this.isUprising) {
       this.uprisingTimer -= dt;
@@ -189,6 +192,10 @@ export class SkeletonWarrior {
       ctx.lineTo(rx + 11, ry - 7);
       ctx.stroke();
       ctx.restore();
+    }
+
+    if (this.sprite && this.sprite.render(ctx, rx, ry + (this.uprisingYOffset || 0), this.facing, this.hitFlashTimer, 1.0)) {
+      return;
     }
 
     ctx.save();
@@ -304,6 +311,7 @@ export class SkeletonArcher {
 
     this.rotation = 0;
     this.spinSpeed = 0;
+    this.sprite = new SkeletonSprite();
   }
 
   getHurtbox() {
@@ -350,6 +358,7 @@ export class SkeletonArcher {
   update(player, combatSystem, vfx, particles, audio, camera, dt) {
     this.animTimer += dt;
     if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+    if (this.sprite) this.sprite.update(dt, this);
 
     if (this.isUprising) {
       this.uprisingTimer -= dt;
@@ -448,6 +457,10 @@ export class SkeletonArcher {
       ctx.lineTo(rx + 11, ry - 7);
       ctx.stroke();
       ctx.restore();
+    }
+
+    if (this.sprite && this.sprite.render(ctx, rx, ry + (this.uprisingYOffset || 0), this.facing, this.hitFlashTimer, 1.0)) {
+      return;
     }
 
     // Render bone arrows
@@ -582,6 +595,7 @@ export class BoneKnight {
 
     this.rotation = 0;
     this.spinSpeed = 0;
+    this.sprite = new SkeletonSprite();
   }
 
   getHurtbox() {
@@ -642,6 +656,7 @@ export class BoneKnight {
   update(player, combatSystem, vfx, particles, audio, camera, dt) {
     this.animTimer += dt;
     if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+    if (this.sprite) this.sprite.update(dt, this);
 
     if (this.isUprising) {
       this.uprisingTimer -= dt;
@@ -730,6 +745,10 @@ export class BoneKnight {
       ctx.lineTo(rx + 13, ry - 8);
       ctx.stroke();
       ctx.restore();
+    }
+
+    if (!this.isReassembling && this.sprite && this.sprite.render(ctx, rx, ry + (this.uprisingYOffset || 0), this.facing, this.hitFlashTimer, 1.35)) {
+      return;
     }
 
     ctx.save();

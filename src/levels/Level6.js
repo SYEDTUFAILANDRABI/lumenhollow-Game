@@ -1,11 +1,11 @@
 // Level 6: Moon Shrine (The Sacred Restoration Finale)
-// Mountaintop altar where the five shards reunite to relight the celestial sky
+// Mountaintop altar where the final Sorcerer Boss guards the celestial sky
 
 export const Level6Data = {
   name: "Moon Shrine",
-  subtitle: "Reunite the five restored shards upon the ancient altar",
+  subtitle: "Confront the Final Sorcerer • Reunite the celestial shards upon the ancient altar",
   index: 5,
-  ambientDarkness: 0.80,
+  ambientDarkness: 0.82,
   ascii: [
     "################################################################################",
     "#                                                                              #",
@@ -24,7 +24,7 @@ export const Level6Data = {
     "#                           #####                                              #",
     "#                                                                              #",
     "#                  #####                                                       #",
-    "#   P                S                                                         #",
+    "#   P                S                                   9                E    #",
     "################################################################################",
     "################################################################################"
   ]
