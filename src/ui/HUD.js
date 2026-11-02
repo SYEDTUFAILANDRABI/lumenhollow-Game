@@ -139,6 +139,46 @@ export class HUD {
         ctx.fillStyle = '#f4f1ff';
         ctx.fillText('SUMMONS [E]', barX + barWidth + 6, sBarY + 6);
       }
+
+      // 1d. Shadow Energy Bar (Below Soul Bar)
+      const shBarY = sBarY + 10;
+      const shRatio = Math.max(0, Math.min(1, (combatSystem.shadowEnergy || 0) / (combatSystem.maxShadowEnergy || 100)));
+      const isAstralReady = (combatSystem.shadowEnergy || 0) >= 50;
+      const inAstral = combatSystem.isAstralForm;
+
+      // Shadow Icon (mini monarch crown)
+      ctx.fillStyle = inAstral ? '#bb44ff' : (isAstralReady ? '#ffd98a' : '#7a2eb8');
+      ctx.beginPath();
+      ctx.arc(barX - 7, shBarY + 3.5, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Shadow Frame
+      ctx.strokeStyle = inAstral ? '#bb44ff' : (isAstralReady ? 'rgba(187, 68, 255, 0.8)' : 'rgba(122, 46, 184, 0.4)');
+      ctx.strokeRect(barX, shBarY, barWidth, 6);
+      ctx.fillStyle = 'rgba(12, 6, 20, 0.85)';
+      ctx.fillRect(barX, shBarY, barWidth, 6);
+
+      // Shadow Fill
+      if (shRatio > 0) {
+        const shGrad = ctx.createLinearGradient(barX, shBarY, barX + barWidth * shRatio, shBarY);
+        shGrad.addColorStop(0, '#3a0c5c');
+        shGrad.addColorStop(1, inAstral ? '#ffffff' : '#bb44ff');
+        ctx.fillStyle = shGrad;
+        ctx.fillRect(barX + 1, shBarY + 1, (barWidth - 2) * shRatio, 4);
+      }
+
+      if (inAstral) {
+        ctx.font = 'bold 9px -apple-system, sans-serif';
+        ctx.fillStyle = '#bb44ff';
+        ctx.fillText('ASTRAL MONARCH [R]', barX + barWidth + 6, shBarY + 6);
+      } else if (isAstralReady) {
+        const pulse = Math.sin(Date.now() * 0.008) > 0;
+        if (pulse) {
+          ctx.font = 'bold 9px -apple-system, sans-serif';
+          ctx.fillStyle = '#bb44ff';
+          ctx.fillText('ASTRAL READY [R]', barX + barWidth + 6, shBarY + 6);
+        }
+      }
     }
 
     // 1c. Combo Counter (Left side, below bars)

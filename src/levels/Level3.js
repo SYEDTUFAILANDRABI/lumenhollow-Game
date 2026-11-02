@@ -1,9 +1,9 @@
 // Level 3: Sky Ruins
-// Vertical ascent across floating islands and moon-glass steps
+// Vertical ascent across floating islands, demons, and the Eclipse Warden
 
 export const Level3Data = {
   name: "Sky Ruins",
-  subtitle: "Ascend to the summit altar • Defeat the Eclipse Warden to unlock the shrine",
+  subtitle: "Ascend past demons to the summit • Defeat the Eclipse Warden to descend lower",
   index: 2,
   ambientDarkness: 0.90,
   ascii: [
@@ -16,15 +16,15 @@ export const Level3Data = {
     "#               #################                         MM                   #",
     "#                                                       MM                     #",
     "#                 MMMM                                                         #",
-    "#                                          S           C                       #",
+    "#                                          S           6                       #",
     "#             MMMM                       #####      _______                    #",
     "#                                                                              #",
-    "#       *                  K                                                   #",
+    "#       *                  5                                                   #",
     "#     #####              _____                                                 #",
     "#                                     ####                                     #",
     "#                  ###                                                         #",
     "#                                ~                                             #",
-    "#           ____                                       F                       #",
+    "#           ____                                       4                       #",
     "#                                                    _____                     #",
     "#                                                                              #",
     "#                                       ####                                   #",

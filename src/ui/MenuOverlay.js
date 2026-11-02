@@ -72,7 +72,7 @@ export class MenuOverlay {
     ctx.restore();
   }
 
-  renderPause(ctx, isMuted, accessibility = {}) {
+  renderPause(ctx, isMuted, accessibility = {}, audioSystem = null) {
     ctx.save();
 
     // Semi-transparent dim
@@ -87,19 +87,27 @@ export class MenuOverlay {
     ctx.fillStyle = '#f4f1ff';
     ctx.shadowColor = '#ffd98a';
     ctx.shadowBlur = 8;
-    ctx.fillText('PAUSED', centerX, centerY - 65);
+    ctx.fillText('PAUSED', centerX, centerY - 72);
     ctx.shadowBlur = 0;
 
     ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.fillStyle = '#ffd98a';
-    ctx.fillText('Press [Esc] to Resume   •   Press [M] to Toggle Sound   •   [R] Respawn', centerX, centerY - 40);
+    ctx.fillText('Press [Esc] to Resume   •   Press [M] to Toggle Sound   •   [R] Respawn', centerX, centerY - 48);
+
+    // Audio & Volume Section
+    const sfxPct = audioSystem ? Math.round((audioSystem.sfxVolume || 0.85) * 100) : 85;
+    const musPct = audioSystem ? Math.round((audioSystem.musicVolume || 0.70) * 100) : 70;
+
+    ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#ffd98a';
+    ctx.fillText(`[7] SFX Volume: ${sfxPct}%      [8] Music Volume: ${musPct}%`, centerX, centerY - 24);
 
     // Accessibility Options List
     ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.fillStyle = '#7be0ad';
-    ctx.fillText('— ACCESSIBILITY & SETTINGS —', centerX, centerY - 15);
+    ctx.fillText('— ACCESSIBILITY & SETTINGS —', centerX, centerY - 2);
 
-    const optY = centerY + 8;
+    const optY = centerY + 18;
     const shakeText = accessibility.shakeEnabled !== false ? 'ON' : 'OFF';
     const flashText = accessibility.flashIntensity === 0 ? 'OFF' : (accessibility.flashIntensity === 0.5 ? '50%' : '100%');
     const hitStopText = accessibility.hitStopEnabled !== false ? 'ON' : 'OFF';
@@ -115,7 +123,7 @@ export class MenuOverlay {
 
     ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.fillStyle = 'rgba(244, 241, 255, 0.5)';
-    ctx.fillText('Press number keys 1-6 to toggle options • [Tab] Opens Skills Menu', centerX, optY + 58);
+    ctx.fillText('Press 1-6 for Settings • 7-8 for Volumes • [Tab] Opens Skills Menu', centerX, optY + 58);
 
     ctx.restore();
   }

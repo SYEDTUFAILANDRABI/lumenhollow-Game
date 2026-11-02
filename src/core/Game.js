@@ -9,6 +9,8 @@ import { Level1Data } from '../levels/Level1.js';
 import { Level2Data } from '../levels/Level2.js';
 import { Level3Data } from '../levels/Level3.js';
 import { Level4Data } from '../levels/Level4.js';
+import { Level5Data } from '../levels/Level5.js';
+import { Level6Data } from '../levels/Level6.js';
 import { LightingSystem } from '../systems/LightingSystem.js';
 import { ParticleSystem } from '../systems/ParticleSystem.js';
 import { AudioSystem } from '../systems/AudioSystem.js';
@@ -20,6 +22,9 @@ import { VFXManager } from '../systems/vfx/VFXManager.js';
 import { TuningPanel } from '../debug/TuningPanel.js';
 import { SummonSystem } from '../systems/summons/SummonSystem.js';
 import { SkillSystem } from '../systems/skills/SkillSystem.js';
+import { AstralMonarch } from '../systems/shadow/AstralMonarch.js';
+import { ShadowArmyManager } from '../systems/shadow/ShadowArmy.js';
+import { MoonLedger } from '../ui/MoonLedger.js';
 
 export const GAME_STATES = {
   MENU: 'MENU',
@@ -56,11 +61,14 @@ export class Game {
     this.tuningPanel = new TuningPanel();
     this.summons = new SummonSystem();
     this.skills = new SkillSystem();
+    this.astralMonarch = new AstralMonarch();
+    this.shadowArmy = new ShadowArmyManager();
+    this.moonLedger = new MoonLedger();
     this.combat.summonSystem = this.summons;
 
     // Game state
     this.state = GAME_STATES.MENU;
-    this.levels = [Level1Data, Level2Data, Level3Data, Level4Data];
+    this.levels = [Level1Data, Level2Data, Level3Data, Level4Data, Level5Data, Level6Data];
     this.currentLevelIndex = 0;
     this.tileMap = null;
     this.player = null;
@@ -192,7 +200,7 @@ export class Game {
       });
       this.camera.shake(4, 0.25);
 
-      if (this.currentLevelIndex === 3) {
+      if (this.currentLevelIndex === 5) {
         this.triggerFinaleCinematic();
       }
     }
@@ -318,6 +326,15 @@ export class Game {
       this.vfx.reducedEffects = this.accessibility.reducedEffects;
       Storage.save(this.accessibility);
     }
+    // Audio Volume Toggles (7 = SFX, 8 = Music)
+    if (this.input.justPressed.has('Digit7')) {
+      const nextSFX = Math.round(((this.audio.sfxVolume - 0.20 + 1.2) % 1.2) * 100) / 100;
+      this.audio.setSFXVolume(nextSFX > 1.0 ? 0 : nextSFX);
+    }
+    if (this.input.justPressed.has('Digit8')) {
+      const nextMus = Math.round(((this.audio.musicVolume - 0.20 + 1.2) % 1.2) * 100) / 100;
+      this.audio.setMusicVolume(nextMus > 1.0 ? 0 : nextMus);
+    }
     if (this.input.actions.skillsJustPressed) {
       this.skills.menuOpen = !this.skills.menuOpen;
     }
@@ -347,8 +364,84 @@ export class Game {
     }
 
     // Apply Time Dilation (slow-mo) + Menu slow-mo
-    const menuSlow = (this.summons.wheelOpen || this.skills.menuOpen) ? 0.12 : 1.0;
+    const menuSlow = (this.summons.wheelOpen || this.skills.menuOpen || this.moonLedger.isOpen) ? 0.12 : 1.0;
     const effectiveDt = dt * this.combat.timeDilation * menuSlow;
+
+    // Astral Form & Shadow Army Controls
+    if (this.input.actions.astralJustPressed) {
+      this.combat.toggleAstralForm(this.player, this.vfx, this.audio, this.camera);
+    }
+    if (this.input.actions.extractJustPressed) {
+      this.shadowArmy.tryExtractSoul(
+        this.player,
+        this.tileMap.soulMarkers,
+        this.moonLedger.stats.sense,
+        this.combat,
+        this.vfx,
+        this.audio,
+        this.camera
+      );
+    }
+    this.shadowArmy.updateRiseAndCommand(
+      this.input.actions.riseHold,
+      this.input.actions.riseJustPressed,
+      this.player,
+      this.vfx,
+      this.audio,
+      this.camera
+    );
+    if (this.input.actions.exchangeJustPressed) {
+      this.shadowArmy.tryShadowExchange(this.player, this.vfx, this.audio, this.camera);
+    }
+    this.shadowArmy.updateSovereignsReach(
+      this.input.actions.reachHold,
+      this.player,
+      this.tileMap.getAllEnemies(),
+      this.tileMap.boss,
+      effectiveDt,
+      this.vfx,
+      this.audio,
+      this.camera
+    );
+
+    // Update Astral Monarch giant avatar
+    if (this.combat.isAstralForm) {
+      this.astralMonarch.update(
+        this.player,
+        effectiveDt,
+        this.vfx,
+        this.audio,
+        this.camera,
+        this.tileMap.getAllEnemies(),
+        this.tileMap.boss
+      );
+    }
+
+    // Update Shadow Army
+    this.shadowArmy.update(
+      this.player,
+      this.tileMap.getAllEnemies(),
+      this.tileMap.boss,
+      effectiveDt,
+      this.combat.isAstralForm,
+      this.skills.domains && this.skills.domains.length > 0,
+      this.vfx,
+      this.audio,
+      this.camera
+    );
+
+    // Update Moon Ledger
+    this.moonLedger.update(effectiveDt, this.input);
+
+    // Objective completions
+    if (this.tileMap.boss && this.tileMap.boss.isDead) {
+      if (this.currentLevelIndex === 2) this.moonLedger.completeObjective('warden', this.audio);
+      if (this.currentLevelIndex === 3) this.moonLedger.completeObjective('maldrek', this.audio);
+      if (this.currentLevelIndex === 4) this.moonLedger.completeObjective('nythrax', this.audio);
+    }
+    if (this.shadowArmy.storedArmy.length >= 4) {
+      this.moonLedger.completeObjective('soldiers', this.audio);
+    }
 
     // Update Underworld Summons
     this.summons.update(
@@ -541,9 +634,15 @@ export class Game {
       // 5. Combat Projectiles & Soul Orbs
       this.combat.render(ctx);
 
-      // 5b. Underworld Summons & Swappable Skills in World Space
+      // 5b. Underworld Summons, Swappable Skills & Shadow Army in World Space
       this.summons.renderWorld(ctx);
-      this.skills.renderWorld(ctx);
+      this.skills.renderWorld(ctx, this.camera);
+      this.shadowArmy.render(ctx, this.camera, this.player);
+
+      // 5c. Astral Monarch giant shadow manifestation
+      if (this.combat.isAstralForm) {
+        this.astralMonarch.render(ctx, this.camera);
+      }
 
       // 6. Player & Firefly Companion
       this.player.render(ctx);
@@ -603,16 +702,17 @@ export class Game {
         this.skills
       );
 
-      // 12b. Summon Wheel & Skills Screen Overlays
+      // 12b. Summon Wheel & Skills Screen Overlays & Moon Ledger
       this.summons.renderWheel(ctx, GAME_WIDTH, GAME_HEIGHT, this.combat.soulEnergy);
       this.skills.renderMenu(ctx, GAME_WIDTH, GAME_HEIGHT);
+      this.moonLedger.render(ctx);
     }
 
     // 13. Overlay Screens
     if (this.state === GAME_STATES.MENU) {
       this.menuOverlay.renderTitle(ctx, this.audio.isMuted);
     } else if (this.state === GAME_STATES.PAUSED) {
-      this.menuOverlay.renderPause(ctx, this.audio.isMuted, this.accessibility);
+      this.menuOverlay.renderPause(ctx, this.audio.isMuted, this.accessibility, this.audio);
     } else if (this.state === GAME_STATES.WIN) {
       this.menuOverlay.renderWin(ctx, this.shardsCollected, time);
     }

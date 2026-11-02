@@ -13,6 +13,11 @@ export const COLORS = {
   MOON_WHITE: '#f4f1ff',
   PINK: '#ff8fab',
   MOON_CYAN: '#7be0ad',
+  EMBER_ORANGE: '#ff6b35',
+  HELLFIRE_RED: '#c1121f',
+  BONE_WHITE: '#e8e1d5',
+  ASTRAL_VIOLET: '#bb44ff',
+  SHADOW_BLACK: '#120d1c',
   SHADOW: 'rgba(9, 8, 20, 0.94)',
   FOG: '#191533'
 };

@@ -33,7 +33,14 @@ export class Input {
       summonQuick5: false,
       skillSlot1: false,
       skillSlot2: false,
-      skillSlot3: false
+      skillSlot3: false,
+      astralJustPressed: false,
+      extractJustPressed: false,
+      riseHold: false,
+      riseJustPressed: false,
+      exchangeJustPressed: false,
+      reachHold: false,
+      ledgerJustPressed: false
     };
 
     // Buffer tracking
@@ -128,6 +135,12 @@ export class Input {
     bindTouch('btn-skill-1', () => { this.touchSkill1JustPressed = true; }, () => {});
     bindTouch('btn-skill-2', () => { this.touchSkill2JustPressed = true; }, () => {});
     bindTouch('btn-skill-3', () => { this.touchSkill3JustPressed = true; }, () => {});
+    bindTouch('btn-astral', () => { this.touchAstralJustPressed = true; }, () => {});
+    bindTouch('btn-extract', () => { this.touchExtractJustPressed = true; }, () => {});
+    bindTouch('btn-rise', () => { this.touchRiseHold = true; this.touchRiseJustPressed = true; }, () => { this.touchRiseHold = false; });
+    bindTouch('btn-exchange', () => { this.touchExchangeJustPressed = true; }, () => {});
+    bindTouch('btn-reach', () => { this.touchReachHold = true; }, () => { this.touchReachHold = false; });
+    bindTouch('btn-ledger', () => { this.touchLedgerJustPressed = true; }, () => {});
   }
 
   update(dt) {
@@ -177,6 +190,15 @@ export class Input {
     const skillSlot2 = jp('KeyI') || !!this.touchSkill2JustPressed;
     const skillSlot3 = jp('KeyO') || !!this.touchSkill3JustPressed;
 
+    // Astral Form & Shadow Army (R, F, G, X, V, T)
+    const astralJustPressed = jp('KeyR') || !!this.touchAstralJustPressed;
+    const extractJustPressed = jp('KeyF') || !!this.touchExtractJustPressed;
+    const riseHold = k('KeyG') || !!this.touchRiseHold;
+    const riseJustPressed = jp('KeyG') || !!this.touchRiseJustPressed;
+    const exchangeJustPressed = jp('KeyX') || !!this.touchExchangeJustPressed;
+    const reachHold = k('KeyV') || !!this.touchReachHold;
+    const ledgerJustPressed = jp('KeyT') || !!this.touchLedgerJustPressed;
+
     this.actions = {
       left,
       right,
@@ -205,7 +227,14 @@ export class Input {
       summonQuick5,
       skillSlot1,
       skillSlot2,
-      skillSlot3
+      skillSlot3,
+      astralJustPressed,
+      extractJustPressed,
+      riseHold,
+      riseJustPressed,
+      exchangeJustPressed,
+      reachHold,
+      ledgerJustPressed
     };
 
     // Clear frame-specific sets
@@ -223,6 +252,11 @@ export class Input {
     this.touchSkill1JustPressed = false;
     this.touchSkill2JustPressed = false;
     this.touchSkill3JustPressed = false;
+    this.touchAstralJustPressed = false;
+    this.touchExtractJustPressed = false;
+    this.touchRiseJustPressed = false;
+    this.touchExchangeJustPressed = false;
+    this.touchLedgerJustPressed = false;
   }
 
   hasBufferedJump() {

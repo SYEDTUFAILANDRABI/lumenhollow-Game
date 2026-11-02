@@ -4,7 +4,17 @@ export class AudioSystem {
   constructor() {
     this.ctx = null;
     this.masterGain = null;
-    this.isMuted = Storage.load().muted || false;
+    this.masterCompressor = null;
+    this.masterLowpass = null;
+    this.sfxGain = null;
+    this.musicGain = null;
+    this.reverbNode = null;
+    this.reverbGain = null;
+
+    const saved = Storage.load();
+    this.isMuted = saved.muted || false;
+    this.sfxVolume = saved.sfxVolume !== undefined ? saved.sfxVolume : 0.85;
+    this.musicVolume = saved.musicVolume !== undefined ? saved.musicVolume : 0.70;
     this.initialized = false;
 
     // Ambient pad state
@@ -13,9 +23,10 @@ export class AudioSystem {
     this.padFilter = null;
     this.currentLevelIndex = -1;
 
-    // Pulse hum continuous state
-    this.pulseOsc = null;
-    this.pulseGain = null;
+    // Soothing pulse state
+    this.pulseActive = false;
+    this.currentPulseData = null;
+    this.pulseChordIndex = 0;
   }
 
   init() {
@@ -26,14 +37,73 @@ export class AudioSystem {
       if (!AudioCtx) return;
 
       this.ctx = new AudioCtx();
+
+      // Master Compressor / Limiter - eliminates clipping
+      this.masterCompressor = this.ctx.createDynamicsCompressor();
+      this.masterCompressor.threshold.setValueAtTime(-12, this.ctx.currentTime);
+      this.masterCompressor.knee.setValueAtTime(30, this.ctx.currentTime);
+      this.masterCompressor.ratio.setValueAtTime(4, this.ctx.currentTime);
+      this.masterCompressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+      this.masterCompressor.release.setValueAtTime(0.25, this.ctx.currentTime);
+
+      // Soft Master Low-pass Filter (~12kHz) so high transients never sound harsh
+      this.masterLowpass = this.ctx.createBiquadFilter();
+      this.masterLowpass.type = 'lowpass';
+      this.masterLowpass.frequency.setValueAtTime(12000, this.ctx.currentTime);
+      this.masterLowpass.Q.setValueAtTime(0.707, this.ctx.currentTime);
+
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.65, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.70, this.ctx.currentTime);
+
+      // Dedicated SFX and Music buses
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
+
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+
+      // Procedural Convolution Reverb (soft noise decaying impulse)
+      this.reverbNode = this.createReverbNode();
+      this.reverbGain = this.ctx.createGain();
+      this.reverbGain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+      if (this.reverbNode) {
+        this.reverbNode.connect(this.reverbGain);
+        this.reverbGain.connect(this.sfxGain);
+      }
+
+      // Audio Graph routing
+      this.sfxGain.connect(this.masterLowpass);
+      this.musicGain.connect(this.masterLowpass);
+      this.masterLowpass.connect(this.masterCompressor);
+      this.masterCompressor.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
 
       this.initialized = true;
       this.setupAmbientPad();
     } catch (e) {
       console.warn('AudioContext initialization deferred:', e);
+    }
+  }
+
+  createReverbNode() {
+    if (!this.ctx) return null;
+    try {
+      const convolver = this.ctx.createConvolver();
+      const rate = this.ctx.sampleRate;
+      const length = Math.floor(rate * 1.5);
+      const decay = 2.4;
+      const buffer = this.ctx.createBuffer(2, length, rate);
+      const left = buffer.getChannelData(0);
+      const right = buffer.getChannelData(1);
+      for (let i = 0; i < length; i++) {
+        const factor = Math.exp((-i / length) * decay);
+        left[i] = (Math.random() * 2 - 1) * factor;
+        right[i] = (Math.random() * 2 - 1) * factor;
+      }
+      convolver.buffer = buffer;
+      return convolver;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -54,13 +124,33 @@ export class AudioSystem {
     if (this.masterGain && this.ctx) {
       const t = this.ctx.currentTime;
       this.masterGain.gain.cancelScheduledValues(t);
-      this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.65, t, 0.04);
+      this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.70, t, 0.04);
     }
     return this.isMuted;
   }
 
+  setSFXVolume(val) {
+    this.sfxVolume = Math.max(0, Math.min(1, Math.round(val * 100) / 100));
+    Storage.save({ sfxVolume: this.sfxVolume });
+    if (this.sfxGain && this.ctx) {
+      const t = this.ctx.currentTime;
+      this.sfxGain.gain.cancelScheduledValues(t);
+      this.sfxGain.gain.setTargetAtTime(this.sfxVolume, t, 0.05);
+    }
+  }
+
+  setMusicVolume(val) {
+    this.musicVolume = Math.max(0, Math.min(1, Math.round(val * 100) / 100));
+    Storage.save({ musicVolume: this.musicVolume });
+    if (this.musicGain && this.ctx) {
+      const t = this.ctx.currentTime;
+      this.musicGain.gain.cancelScheduledValues(t);
+      this.musicGain.gain.setTargetAtTime(this.musicVolume, t, 0.05);
+    }
+  }
+
   setupAmbientPad() {
-    if (!this.ctx || !this.masterGain) return;
+    if (!this.ctx || !this.musicGain) return;
 
     this.padFilter = this.ctx.createBiquadFilter();
     this.padFilter.type = 'lowpass';
@@ -71,7 +161,7 @@ export class AudioSystem {
     this.padGain.gain.setValueAtTime(0.18, this.ctx.currentTime);
 
     this.padFilter.connect(this.padGain);
-    this.padGain.connect(this.masterGain);
+    this.padGain.connect(this.musicGain);
   }
 
   setLevelMusic(levelIndex) {
@@ -83,12 +173,16 @@ export class AudioSystem {
     // 0: D minor (mystical forest)
     // 1: C minor (deep crystal cave)
     // 2: F maj7 (sky heights)
-    // 3: G celestial (sacred moon shrine)
+    // 3: G celestial (sacred moon shrine / ember descent)
+    // 4: Bb dark (abyssal throne)
+    // 5: G major sacred (moon restored)
     const chords = [
       [146.83, 174.61, 220.00, 293.66], // D3, F3, A3, D4
       [130.81, 155.56, 196.00, 261.63], // C3, Eb3, G3, C4
       [174.61, 220.00, 261.63, 329.63], // F3, A3, C4, E4
-      [196.00, 246.94, 293.66, 369.99]  // G3, B3, D4, F#4
+      [116.54, 146.83, 174.61, 233.08], // Bb2, D3, F3, Bb3 (molten depths)
+      [98.00, 123.47, 146.83, 196.00],   // G2, B2, D3, G3 (abyss sovereign)
+      [196.00, 246.94, 293.66, 369.99]  // G3, B3, D4, F#4 (sacred restoration)
     ];
 
     const chord = chords[Math.min(levelIndex, chords.length - 1)];
@@ -133,13 +227,13 @@ export class AudioSystem {
 
     osc.type = 'sine';
     osc.frequency.setValueAtTime(140, t);
-    osc.frequency.exponentialRampToValueAtTime(260, t + 0.12);
+    osc.frequency.exponentialRampToValueAtTime(250, t + 0.12);
 
-    gain.gain.setValueAtTime(0.14, t);
+    gain.gain.setValueAtTime(0.12, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.15);
@@ -154,49 +248,149 @@ export class AudioSystem {
     const gain = this.ctx.createGain();
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(75, t);
-    osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+    osc.frequency.setValueAtTime(70, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.08);
 
-    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.setValueAtTime(0.14, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.1);
   }
 
+  // --- Soothing Web Audio Lantern Pulse ---
   setPulseHum(active) {
     this.ensureContext();
     if (!this.ctx || this.isMuted) return;
 
-    const t = this.ctx.currentTime;
-    if (active) {
-      if (!this.pulseOsc) {
-        this.pulseOsc = this.ctx.createOscillator();
-        this.pulseGain = this.ctx.createGain();
-        this.pulseOsc.type = 'triangle';
-        this.pulseOsc.frequency.setValueAtTime(320, t);
-
-        this.pulseGain.gain.setValueAtTime(0.001, t);
-        this.pulseGain.gain.linearRampToValueAtTime(0.08, t + 0.1);
-
-        this.pulseOsc.connect(this.pulseGain);
-        this.pulseGain.connect(this.masterGain);
-        this.pulseOsc.start(t);
-      }
-    } else {
-      if (this.pulseOsc) {
-        this.pulseGain.gain.linearRampToValueAtTime(0.001, t + 0.1);
-        const osc = this.pulseOsc;
-        setTimeout(() => {
-          try { osc.stop(); } catch (e) {}
-        }, 120);
-        this.pulseOsc = null;
-        this.pulseGain = null;
-      }
+    if (active && !this.pulseActive) {
+      this.pulseActive = true;
+      this.startSoothingPulse();
+    } else if (!active && this.pulseActive) {
+      this.pulseActive = false;
+      this.stopSoothingPulse();
     }
+  }
+
+  startSoothingPulse() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Pentatonic scale chords for peaceful ambient variety
+    const pentatonicSets = [
+      [261.63, 329.63, 392.00, 523.25], // C4, E4, G4, C5 (luminous heart)
+      [293.66, 369.99, 440.00, 587.33], // D4, F#4, A4, D5 (calm dawn)
+      [329.63, 392.00, 493.88, 659.25], // E4, G4, B4, E5 (mystic breeze)
+      [392.00, 493.88, 587.33, 783.99], // G4, B4, D5, G5 (starlight)
+      [440.00, 523.25, 659.25, 880.00]  // A4, C5, E5, A5 (celestial chime)
+    ];
+
+    this.pulseChordIndex = ((this.pulseChordIndex || 0) + 1) % pentatonicSets.length;
+    const freqs = pentatonicSets[this.pulseChordIndex];
+
+    // Anti-harsh low-pass filter around 2.4kHz
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2400, t);
+    filter.Q.setValueAtTime(0.9, t);
+
+    // Master pulse gain with slow, gentle attack (120ms)
+    const pulseGain = this.ctx.createGain();
+    pulseGain.gain.setValueAtTime(0.0001, t);
+    pulseGain.gain.linearRampToValueAtTime(0.06, t + 0.12);
+
+    filter.connect(pulseGain);
+    pulseGain.connect(this.sfxGain || this.masterGain);
+
+    if (this.reverbNode) {
+      pulseGain.connect(this.reverbNode);
+    }
+
+    const oscs = [];
+
+    // 3 Layered oscillators: gentle sine base, detuned triangle body, soft octave shimmer
+    const types = ['sine', 'triangle', 'sine'];
+    const detunes = [-4, 3, 6];
+    const amps = [0.035, 0.024, 0.015];
+
+    for (let i = 0; i < 3; i++) {
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
+
+      osc.type = types[i];
+      osc.frequency.setValueAtTime(freqs[i % freqs.length], t);
+      osc.detune.setValueAtTime(detunes[i], t);
+
+      oscGain.gain.setValueAtTime(0.0001, t);
+      oscGain.gain.linearRampToValueAtTime(amps[i], t + 0.12);
+
+      osc.connect(oscGain);
+      oscGain.connect(filter);
+      osc.start(t);
+      oscs.push(osc);
+    }
+
+    // Soft airy noise breath through band-pass filter (~1000Hz)
+    try {
+      const noiseBuffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 1.5), this.ctx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.4;
+      }
+      const noiseSource = this.ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      noiseSource.loop = true;
+
+      const bandpass = this.ctx.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.frequency.setValueAtTime(1050, t);
+      bandpass.Q.setValueAtTime(1.8, t);
+
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.0001, t);
+      noiseGain.gain.linearRampToValueAtTime(0.012, t + 0.15);
+
+      noiseSource.connect(bandpass);
+      bandpass.connect(noiseGain);
+      noiseGain.connect(filter);
+      noiseSource.start(t);
+      oscs.push(noiseSource);
+    } catch (e) {}
+
+    this.currentPulseData = {
+      oscs,
+      pulseGain,
+      startTime: t
+    };
+  }
+
+  stopSoothingPulse() {
+    if (!this.ctx || !this.currentPulseData) return;
+    const t = this.ctx.currentTime;
+    const { oscs, pulseGain } = this.currentPulseData;
+    this.currentPulseData = null;
+
+    // Smooth 1.5s exponential release, zero clicks
+    try {
+      pulseGain.gain.cancelScheduledValues(t);
+      pulseGain.gain.setValueAtTime(Math.max(0.0001, pulseGain.gain.value), t);
+      pulseGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+
+      setTimeout(() => {
+        oscs.forEach(o => {
+          try {
+            o.stop();
+            o.disconnect();
+          } catch (e) {}
+        });
+        try {
+          pulseGain.disconnect();
+        } catch (e) {}
+      }, 1600);
+    } catch (e) {}
   }
 
   playShardPickup() {
@@ -218,7 +412,7 @@ export class AudioSystem {
       gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.45);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.sfxGain || this.masterGain);
 
       osc.start(t + i * 0.06);
       osc.stop(t + i * 0.06 + 0.5);
@@ -244,7 +438,7 @@ export class AudioSystem {
       gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.7);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.sfxGain || this.masterGain);
 
       osc.start(t + i * 0.08);
       osc.stop(t + i * 0.08 + 0.75);
@@ -267,7 +461,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.25);
@@ -289,7 +483,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.32);
@@ -314,7 +508,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + (comboIndex === 2 ? 0.22 : 0.14));
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.24);
@@ -336,7 +530,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.2);
@@ -358,7 +552,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.2);
@@ -380,7 +574,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.12);
@@ -402,7 +596,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.24);
@@ -424,7 +618,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.42);
@@ -447,7 +641,7 @@ export class AudioSystem {
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.sfxGain || this.masterGain);
 
       osc.start(t);
       osc.stop(t + 0.42);
@@ -477,7 +671,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.15);
   }
@@ -618,7 +812,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.26);
@@ -640,7 +834,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.2);
@@ -662,7 +856,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.22);
@@ -684,7 +878,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.26);
@@ -706,7 +900,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.24);
@@ -728,7 +922,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.52);
@@ -750,7 +944,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
 
     osc.start(t);
     osc.stop(t + 0.48);
@@ -774,7 +968,7 @@ export class AudioSystem {
       gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.1 + 1.2);
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.sfxGain || this.masterGain);
 
       osc.start(t + idx * 0.1);
       osc.stop(t + idx * 0.1 + 1.3);
@@ -807,7 +1001,7 @@ export class AudioSystem {
         gain.gain.exponentialRampToValueAtTime(0.001, t + step * 0.45 + 1.2);
 
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain || this.masterGain);
 
         osc.start(t + step * 0.45);
         osc.stop(t + step * 0.45 + 1.3);
@@ -832,7 +1026,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.4);
   }
@@ -858,7 +1052,7 @@ export class AudioSystem {
 
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.55);
   }
@@ -879,7 +1073,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.28);
   }
@@ -900,7 +1094,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.25);
   }
@@ -921,7 +1115,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.6);
   }
@@ -942,7 +1136,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.25);
   }
@@ -954,22 +1148,49 @@ export class AudioSystem {
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(520, t);
-    osc.frequency.exponentialRampToValueAtTime(120, t + 0.35);
+    osc.frequency.setValueAtTime(440, t);
+    osc.frequency.exponentialRampToValueAtTime(110, t + 0.35);
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1200, t);
-
-    gain.gain.setValueAtTime(0.32, t);
+    gain.gain.setValueAtTime(0.28, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
+    osc.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain);
     osc.start(t);
     osc.stop(t + 0.4);
+  }
+
+  playSkeletonUprising() {
+    this.ensureContext();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+    // Low earth-rumble
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(70, t);
+    osc.frequency.exponentialRampToValueAtTime(35, t + 0.45);
+    gain.gain.setValueAtTime(0.26, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.48);
+    osc.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.5);
+
+    // Rattling bone clicks
+    for (let i = 0; i < 3; i++) {
+      const clickOsc = this.ctx.createOscillator();
+      const clickGain = this.ctx.createGain();
+      clickOsc.type = 'sine';
+      clickOsc.frequency.setValueAtTime(380 + i * 90, t + 0.07 * i);
+      clickGain.gain.setValueAtTime(0.12, t + 0.07 * i);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.07 * i + 0.04);
+      clickOsc.connect(clickGain);
+      clickGain.connect(this.sfxGain || this.masterGain);
+      clickOsc.start(t + 0.07 * i);
+      clickOsc.stop(t + 0.07 * i + 0.05);
+    }
   }
 }

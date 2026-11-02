@@ -43,6 +43,11 @@ export class VFXManager {
     }
   }
 
+  triggerHitSparks(x, y, color = '#ffd98a') {
+    this.addShockwave(x, y, 40, 0.2, color);
+    this.triggerFlash(color, 0.04);
+  }
+
   triggerZoomPunch(scale = 1.12, duration = 0.15) {
     this.zoomScale = this.reducedEffects ? Math.min(1.05, scale) : scale;
     this.targetZoom = 1.0;

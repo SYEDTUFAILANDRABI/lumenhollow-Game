@@ -9,6 +9,12 @@ import { CombatDummy } from '../entities/enemies/CombatDummy.js';
 import { HollowKnight } from '../entities/enemies/HollowKnight.js';
 import { CrowWraith } from '../entities/enemies/CrowWraith.js';
 import { EclipseWarden } from '../entities/boss/EclipseWarden.js';
+import { SkeletonWarrior, SkeletonArcher, BoneKnight } from '../entities/enemies/Skeletons.js';
+import { FireImp, HornedBrute, HellCaster } from '../entities/enemies/Demons.js';
+import { SoulMarker } from '../entities/enemies/SoulMarker.js';
+import { DemonLord } from '../entities/boss/DemonLord.js';
+import { ArchDemon } from '../entities/boss/ArchDemon.js';
+import { AbyssSovereign } from '../entities/boss/AbyssSovereign.js';
 
 export class TileMap {
   constructor(asciiLines, levelIndex = 0, levelName = '') {
@@ -29,6 +35,13 @@ export class TileMap {
     this.dummies = [];
     this.knights = [];
     this.crows = [];
+    this.skeletons = [];
+    this.archers = [];
+    this.boneKnights = [];
+    this.fireImps = [];
+    this.hornedBrutes = [];
+    this.hellCasters = [];
+    this.soulMarkers = [];
     this.boss = null;
     this.fireflies = [];
     this.moonGlassPlatforms = [];
@@ -76,6 +89,42 @@ export class TileMap {
         } else if (char === 'B') {
           this.boss = new EclipseWarden(px + 16, py + TILE_SIZE);
           row.push(' ');
+        } else if (char === '1') {
+          this.skeletons.push(new SkeletonWarrior(px + 10, py + TILE_SIZE));
+          row.push(' ');
+        } else if (char === '2') {
+          this.archers.push(new SkeletonArcher(px + 10, py + TILE_SIZE));
+          row.push(' ');
+        } else if (char === '3') {
+          this.boneKnights.push(new BoneKnight(px + 10, py + TILE_SIZE));
+          row.push(' ');
+        } else if (char === 'U') {
+          this.skeletons.push(new SkeletonWarrior(px + 10, py + TILE_SIZE, true));
+          row.push(' ');
+        } else if (char === 'A') {
+          this.archers.push(new SkeletonArcher(px + 10, py + TILE_SIZE, true));
+          row.push(' ');
+        } else if (char === 'O') {
+          this.boneKnights.push(new BoneKnight(px + 10, py + TILE_SIZE, true));
+          row.push(' ');
+        } else if (char === '4') {
+          this.fireImps.push(new FireImp(px + 10, py + 10));
+          row.push(' ');
+        } else if (char === '5') {
+          this.hornedBrutes.push(new HornedBrute(px + 10, py + TILE_SIZE));
+          row.push(' ');
+        } else if (char === '6') {
+          this.hellCasters.push(new HellCaster(px + 10, py + TILE_SIZE));
+          row.push(' ');
+        } else if (char === '7') {
+          this.boss = new DemonLord(px + 16, py + TILE_SIZE);
+          row.push(' ');
+        } else if (char === '8') {
+          this.boss = new ArchDemon(px + 16, py + TILE_SIZE);
+          row.push(' ');
+        } else if (char === '9') {
+          this.boss = new AbyssSovereign(px + 16, py + TILE_SIZE);
+          row.push(' ');
         } else if (char === 'F') {
           this.fireflies.push(new FireflyPickup(px + 10, py + 10));
           row.push(' ');
@@ -117,7 +166,18 @@ export class TileMap {
   }
 
   getAllEnemies() {
-    return [...this.wisps, ...this.dummies, ...this.knights, ...this.crows];
+    return [
+      ...this.wisps,
+      ...this.dummies,
+      ...this.knights,
+      ...this.crows,
+      ...this.skeletons,
+      ...this.archers,
+      ...this.boneKnights,
+      ...this.fireImps,
+      ...this.hornedBrutes,
+      ...this.hellCasters
+    ];
   }
 
   updateEntities(player, particleSystem, audioSystem, camera, onShardCollect, dt, combatSystem, vfx, shardUpgrades) {
@@ -173,9 +233,66 @@ export class TileMap {
       crow.update(player, particleSystem, audioSystem, dt);
     }
 
+    for (const skel of this.skeletons) {
+      skel.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    for (const arch of this.archers) {
+      arch.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    for (const bk of this.boneKnights) {
+      bk.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    for (const imp of this.fireImps) {
+      imp.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    for (const brute of this.hornedBrutes) {
+      brute.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    for (const caster of this.hellCasters) {
+      caster.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    // Spawn Soul Markers on Enemy & Boss Death
+    const all = this.getAllEnemies();
+    for (const e of all) {
+      if (e.isDead && !e.soulSpawned && e.tier && e.tier !== 'DUMMY') {
+        e.soulSpawned = true;
+        this.soulMarkers.push(new SoulMarker(e.x, e.y, e.name, e.tier, e.name));
+      }
+    }
+    if (this.boss && this.boss.isDead && !this.boss.soulSpawned && this.boss.tier !== 'ABYSS_SOVEREIGN') {
+      this.boss.soulSpawned = true;
+      this.soulMarkers.push(new SoulMarker(this.boss.x, this.boss.y, this.boss.name, this.boss.tier, this.boss.name));
+    }
+
+    // Update Soul Markers
+    for (let i = this.soulMarkers.length - 1; i >= 0; i--) {
+      this.soulMarkers[i].update(dt, player, particleSystem);
+      if (this.soulMarkers[i].dead) {
+        this.soulMarkers.splice(i, 1);
+      }
+    }
+
     // 6. Boss update
     if (this.boss) {
       this.boss.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+    }
+
+    // Dynamic Skeleton Uprisings from beneath
+    this.uprisingTimer = (this.uprisingTimer || 0) + dt;
+    if (this.uprisingTimer >= 6.5) {
+      this.uprisingTimer = 0;
+      const activeSkeletons = this.skeletons.filter(s => !s.isDead).length +
+                              this.archers.filter(s => !s.isDead).length +
+                              this.boneKnights.filter(s => !s.isDead).length;
+      if (activeSkeletons < 8) {
+        this.triggerDynamicSkeletonUprising(player, particleSystem, audioSystem, camera);
+      }
     }
 
     // 7. Hazard Check (Spikes/brambles)
@@ -192,6 +309,55 @@ export class TileMap {
       if (player.y > this.pixelHeight + 40) {
         player.die(particleSystem, camera, audioSystem);
       }
+    }
+  }
+
+  triggerDynamicSkeletonUprising(player, particleSystem, audioSystem, camera) {
+    if (!player || player.isDead) return;
+
+    // Try finding a solid floor within range x ± 45..100
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const distance = 40 + Math.random() * 65;
+    const targetX = player.x + dir * distance;
+    const col = Math.floor(targetX / TILE_SIZE);
+
+    if (col < 2 || col >= this.widthInTiles - 2) return;
+
+    // Scan downward from player tile
+    const startRow = Math.max(1, Math.floor((player.y - 10) / TILE_SIZE));
+    let groundRow = -1;
+    for (let r = startRow; r < Math.min(this.heightInTiles - 1, startRow + 8); r++) {
+      if (this.getTile(col, r) === '#' && this.getTile(col, r - 1) === ' ') {
+        groundRow = r;
+        break;
+      }
+    }
+
+    if (groundRow === -1) return;
+
+    const spawnX = col * TILE_SIZE + TILE_SIZE / 2;
+    const spawnY = groundRow * TILE_SIZE;
+
+    // 60% SkeletonWarrior, 25% SkeletonArcher, 15% BoneKnight
+    const rand = Math.random();
+    if (rand < 0.60) {
+      this.skeletons.push(new SkeletonWarrior(spawnX, spawnY, true));
+    } else if (rand < 0.85) {
+      this.archers.push(new SkeletonArcher(spawnX, spawnY, true));
+    } else {
+      this.boneKnights.push(new BoneKnight(spawnX, spawnY, true));
+    }
+
+    if (particleSystem) {
+      particleSystem.emitLandPuff(spawnX, spawnY);
+      particleSystem.emitLandPuff(spawnX - 10, spawnY);
+      particleSystem.emitLandPuff(spawnX + 10, spawnY);
+    }
+    if (audioSystem && audioSystem.playSkeletonUprising) {
+      audioSystem.playSkeletonUprising();
+    }
+    if (camera) {
+      camera.shake(2.0, 0.2);
     }
   }
 
@@ -348,9 +514,20 @@ export class TileMap {
       wisp.render(ctx);
     }
 
+    // Render New Enemy Tiers
+    for (const skel of this.skeletons) skel.render(ctx, camera);
+    for (const arch of this.archers) arch.render(ctx, camera);
+    for (const bk of this.boneKnights) bk.render(ctx, camera);
+    for (const imp of this.fireImps) imp.render(ctx, camera);
+    for (const brute of this.hornedBrutes) brute.render(ctx, camera);
+    for (const caster of this.hellCasters) caster.render(ctx, camera);
+
+    // Render Soul Markers
+    for (const sm of this.soulMarkers) sm.render(ctx, camera);
+
     // Render Boss
     if (this.boss) {
-      this.boss.render(ctx);
+      this.boss.render(ctx, camera);
     }
   }
 

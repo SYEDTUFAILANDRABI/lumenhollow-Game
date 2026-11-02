@@ -58,7 +58,49 @@ export const COMBAT = {
     DUMMY: 30,
     CROW: 45,
     KNIGHT: 65,
-    BOSS: 95
+    BOSS: 95,
+    // New Tier Will Values
+    SKELETON_WARRIOR: 30,
+    SKELETON_ARCHER: 25,
+    BONE_KNIGHT: 38,
+    FIRE_IMP: 50,
+    HORNED_BRUTE: 62,
+    HELL_CASTER: 58,
+    DEMON_LORD: 85,
+    ARCH_DEMON: 96,
+    ABYSS_SOVEREIGN: 100
+  },
+  ENEMY_TIERS: {
+    SKELETON_WARRIOR: { hp: 45, damage: 14, speed: 45, will: 30, xp: 25 },
+    SKELETON_ARCHER:  { hp: 32, damage: 18, speed: 35, will: 25, xp: 25 },
+    BONE_KNIGHT:      { hp: 75, damage: 22, speed: 50, will: 38, xp: 45 },
+    FIRE_IMP:         { hp: 35, damage: 16, speed: 85, will: 50, xp: 35 },
+    HORNED_BRUTE:     { hp: 110, damage: 28, speed: 70, will: 62, xp: 60 },
+    HELL_CASTER:      { hp: 60, damage: 25, speed: 40, will: 58, xp: 55 },
+    DEMON_LORD:       { hp: 420, damage: 30, speed: 65, will: 85, xp: 250 },
+    ARCH_DEMON:       { hp: 550, damage: 35, speed: 95, will: 96, xp: 400 },
+    ABYSS_SOVEREIGN:  { hp: 800, damage: 40, speed: 50, will: 100, xp: 800 }
+  },
+  ASTRAL: {
+    MAX_SHADOW_ENERGY: 100,
+    MIN_ACTIVATE_ENERGY: 50,
+    DRAIN_RATE: 5.0, // ~20 seconds
+    SPEED_MULT: 1.25,
+    TRIPLE_JUMP_FORCE: -330,
+    DAMAGE_MULT: 1.40,
+    AURA_RADIUS_MULT: 1.50,
+    SOLDIER_BUFF_MULT: 1.50
+  },
+  SHADOW_ARMY: {
+    BASE_CAPACITY: 4,
+    SOUL_MARKER_LIFETIME: 5.0,
+    EXTRACTION_RATES: {
+      SKELETON: 0.90,
+      DEMON: 0.60,
+      DEMON_LORD: 0.35,
+      ARCH_DEMON: 0.20,
+      ABYSS_SOVEREIGN: 0.00
+    }
   },
   COMBO: {
     TIMEOUT: 2.4,

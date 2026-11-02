@@ -12,6 +12,12 @@ export class CombatSystem {
     this.soulEnergy = 40;
     this.maxSoulEnergy = 100;
 
+    // Shadow Energy & Astral Form (Shadow Monarch)
+    this.shadowEnergy = 0;
+    this.maxShadowEnergy = COMBAT.ASTRAL.MAX_SHADOW_ENERGY;
+    this.isAstralForm = false;
+    this.astralTimer = 0;
+
     // Combo system
     this.comboCount = 0;
     this.comboTimer = 0;
@@ -46,6 +52,34 @@ export class CombatSystem {
     this.soulEnergy = Math.min(this.maxSoulEnergy, this.soulEnergy + amount);
   }
 
+  addShadowEnergy(amount) {
+    if (this.isAstralForm) return;
+    this.shadowEnergy = Math.min(this.maxShadowEnergy, this.shadowEnergy + amount);
+  }
+
+  toggleAstralForm(player, vfx, audio, camera) {
+    if (this.isAstralForm) {
+      // Leave early
+      this.isAstralForm = false;
+      player.isAstralForm = false;
+      if (audio && audio.playDissolve) audio.playDissolve();
+      return;
+    }
+
+    if (this.shadowEnergy < COMBAT.ASTRAL.MIN_ACTIVATE_ENERGY) return;
+
+    this.isAstralForm = true;
+    player.isAstralForm = true;
+    this.triggerHitStop(0.12);
+
+    if (vfx) {
+      vfx.triggerFlash('#bb44ff', 0.35);
+      vfx.addShockwave(player.x, player.y, 220, 0.45, '#bb44ff');
+    }
+    if (camera) camera.shake(8, 0.35);
+    if (audio && audio.playShrineActivate) audio.playShrineActivate();
+  }
+
   isAuraReady() {
     return this.eclipseMeter >= this.maxEclipseMeter && !this.isEclipseForm;
   }
@@ -63,6 +97,7 @@ export class CombatSystem {
     this.comboCount++;
     this.comboTimer = COMBAT.COMBO.TIMEOUT;
     this.addEclipseMeter(COMBAT.ECLIPSE.HIT_GAIN + this.comboCount * 0.4);
+    this.addShadowEnergy(2);
 
     if (vfx) {
       vfx.damageNumbers.add(x, y, damage, isCrit, false);
@@ -75,6 +110,7 @@ export class CombatSystem {
 
   registerKill(x, y, vfx, audio, camera) {
     this.addEclipseMeter(COMBAT.ECLIPSE.KILL_GAIN);
+    this.addShadowEnergy(15);
     this.triggerHitStop(0.12);
 
     // Spawn 3-5 soul orbs flying to player lantern
@@ -122,6 +158,16 @@ export class CombatSystem {
       if (this.eclipseFormTimer <= 0) {
         this.isEclipseForm = false;
         player.exitEclipseForm();
+      }
+    }
+
+    // Astral Form (Shadow Monarch) duration & energy drain
+    if (this.isAstralForm) {
+      this.shadowEnergy = Math.max(0, this.shadowEnergy - COMBAT.ASTRAL.DRAIN_RATE * dt);
+      player.isAstralForm = true;
+      if (this.shadowEnergy <= 0) {
+        this.isAstralForm = false;
+        player.isAstralForm = false;
       }
     }
 
@@ -256,8 +302,9 @@ export class CombatSystem {
     // Calculate dynamic range: base 1150px (covers 1.5x screen diagonal), scaled by charge and moon shards
     const shardBonus = Object.values(shardUpgrades).filter(Boolean).length * 0.12;
     const chargeRatio = Math.max(0.6, Math.min(1.4, chargeTime / 0.7));
-    const auraRadius = COMBAT.ECLIPSE.AURA_RADIUS * (1 + shardBonus) * chargeRatio;
-    const auraDmg = COMBAT.ECLIPSE.AURA_DAMAGE * (1 + shardBonus * 0.5);
+    const astralMult = this.isAstralForm ? COMBAT.ASTRAL.AURA_RADIUS_MULT : 1.0;
+    const auraRadius = COMBAT.ECLIPSE.AURA_RADIUS * (1 + shardBonus) * chargeRatio * astralMult;
+    const auraDmg = COMBAT.ECLIPSE.AURA_DAMAGE * (1 + shardBonus * 0.5) * (this.isAstralForm ? COMBAT.ASTRAL.DAMAGE_MULT : 1.0);
 
     if (vfx) {
       vfx.triggerZoomPunch(1.22, 0.22);
@@ -296,21 +343,25 @@ export class CombatSystem {
       if (dist <= auraRadius) {
         const will = target.will || 50;
 
-        if (will <= 25) {
-          // Low will (Wisps): freeze, turn grey, dissolve into ash
+        if (will <= 38) {
+          // Low will (Wisps, Skeletons): freeze, turn grey, dissolve into ash (faint)
           target.dieToAura(this, vfx, particles, audio, camera);
         } else if (will <= 70) {
-          // Medium will (Knights, Crow Wraiths): forced to knees & trembling
+          // Medium will (Knights, Demons): forced to knees & trembling (kneel)
           const pushAngle = Math.atan2(target.y - py, target.x - px);
-          target.applyStun(2.2);
+          target.applyStun ? target.applyStun(2.4) : (target.isStunned = true);
           target.state = 'COWER';
           target.takeDamage(auraDmg, target.x, target.y, this, vfx, audio, camera);
           target.vx = Math.cos(pushAngle) * 220;
           target.vy = Math.sin(pushAngle) * 140 - 50;
+        } else if (will <= 88) {
+          // High will (Demon Lord, Eclipse Warden): staggered
+          target.applyStun ? target.applyStun(1.0) : (target.isStunned = true);
+          target.takeDamage(auraDmg * 0.70, target.x, target.y, this, vfx, audio, camera);
         } else {
-          // Boss: briefly staggered
-          target.applyStun(1.1);
-          target.takeDamage(auraDmg * 0.65, target.x, target.y, this, vfx, audio, camera);
+          // Very high will (Arch Demon, Abyss Sovereign): barely reacts
+          target.applyStun ? target.applyStun(0.25) : (target.isStunned = true);
+          target.takeDamage(auraDmg * 0.40, target.x, target.y, this, vfx, audio, camera);
         }
       }
     }

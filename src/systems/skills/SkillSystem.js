@@ -1,4 +1,4 @@
-import { SKILL_POOL, ActiveGravityWell, ActiveShadowClone, ActiveSpiritLance } from './SkillAbilities.js';
+import { SKILL_POOL, ActiveGravityWell, ActiveShadowClone, ActiveSpiritLance, ActiveMonarchDomain } from './SkillAbilities.js';
 import { Projectile } from '../combat/Projectile.js';
 
 export class SkillSystem {
@@ -17,6 +17,7 @@ export class SkillSystem {
     this.gravityWells = [];
     this.clones = [];
     this.lances = [];
+    this.domains = [];
 
     this.loadFromStorage();
   }
@@ -179,6 +180,33 @@ export class SkillSystem {
         }
         break;
       }
+      case 'flurry': {
+        // Blade Flurry: rapid multi-dash forward with dual crescent cuts
+        player.vx = player.facing * 420;
+        if (audio) audio.playSlash(0);
+        if (camera) camera.shake(6, 0.25);
+        if (vfx) {
+          vfx.triggerHitSparks(player.x + player.facing * 20, player.y - 12, '#bb44ff');
+          vfx.addSlashArc(player.x + player.facing * 25, player.y, player.facing, 1, true);
+        }
+        const all = [...enemies];
+        if (boss && !boss.isDead) all.push(boss);
+        for (const t of all) {
+          if (t.isDead) continue;
+          if (Math.hypot(t.x - player.x, t.y - player.y) < 65) {
+            t.takeDamage(42, t.x, t.y, combatSystem, vfx, audio, camera);
+          }
+        }
+        break;
+      }
+      case 'domain': {
+        // Monarch's Domain: expands inky purple cosmic pool (10s)
+        this.domains.push(new ActiveMonarchDomain(player.x, player.y));
+        if (camera) camera.shake(8, 0.4);
+        if (vfx) vfx.triggerFlash('#bb44ff', 0.3);
+        if (audio && audio.playMonarchDomain) audio.playMonarchDomain();
+        break;
+      }
     }
 
     return true;
@@ -220,9 +248,16 @@ export class SkillSystem {
       ln.update(dt);
       if (ln.dead) this.lances.splice(i, 1);
     }
+
+    for (let i = this.domains.length - 1; i >= 0; i--) {
+      const dm = this.domains[i];
+      dm.update(dt, enemies, boss);
+      if (dm.dead) this.domains.splice(i, 1);
+    }
   }
 
-  renderWorld(ctx) {
+  renderWorld(ctx, camera) {
+    for (const dm of this.domains) dm.render(ctx, camera);
     for (const gw of this.gravityWells) gw.render(ctx);
     for (const cl of this.clones) cl.render(ctx);
     for (const ln of this.lances) ln.render(ctx);

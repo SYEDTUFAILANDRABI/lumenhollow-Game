@@ -13,7 +13,9 @@ export class Storage {
     flashIntensity: 1.0,
     hitStopEnabled: true,
     damageNumbers: true,
-    highQuality: true
+    highQuality: true,
+    sfxVolume: 0.85,
+    musicVolume: 0.70
   };
 
   static load() {

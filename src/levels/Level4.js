@@ -1,31 +1,31 @@
-// Level 4: Moon Shrine (The Finale)
-// Mountaintop altar where the moon shards unite to relight the sky
+// Level 4: Ember Descent
+// A perilous descent into the lower realm, ending with Demon Lord Maldrek
 
 export const Level4Data = {
-  name: "Moon Shrine",
-  subtitle: "Return the five shards to restore the moon",
+  name: "Ember Descent",
+  subtitle: "Descend into the fiery abyss • Defeat Demon Lord Maldrek • Shard 4",
   index: 3,
-  ambientDarkness: 0.82,
+  ambientDarkness: 0.95,
   ascii: [
     "################################################################################",
     "#                                                                              #",
+    "#   P                                                                          #",
+    "#  #####              1                                     *                  #",
+    "#                   _____                                 #####                #",
+    "#                                   ~                                          #",
+    "#            2                                                                 #",
+    "#          #####                                        3                      #",
+    "#                              5                      _____                    #",
+    "#                            _____                                             #",
     "#                                                                              #",
+    "#        4                                                                     #",
+    "#      _____                    MMMM                                           #",
     "#                                                                              #",
+    "#                     6                                                        #",
+    "#                   _____                          S         7            E    #",
+    "#                                                #####  ########################",
     "#                                                                              #",
-    "#                                                                              #",
-    "#                                                                              #",
-    "#                                                   *                          #",
-    "#                                                 #####                        #",
-    "#                                              MM                              #",
-    "#                                           MM                                 #",
-    "#                                        MM                                    #",
-    "#                                    ######                                    #",
-    "#                                                                              #",
-    "#                           #####                                              #",
-    "#                                                                              #",
-    "#                  #####                                                       #",
-    "#   P                S                                                         #",
-    "################################################################################",
+    "##########^^^^^^^^^^^^^##############^^^^^^^^^^^^^^^^###########################",
     "################################################################################"
   ]
 };

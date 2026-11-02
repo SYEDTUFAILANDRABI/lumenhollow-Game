@@ -64,8 +64,81 @@ export const SKILL_POOL = [
     cooldown: 3.0,
     icon: '⚡',
     unlocked: true
+  },
+  {
+    id: 'flurry',
+    name: 'Blade Flurry',
+    desc: 'Dual shadow blades rapid dash combo with multiple slashes',
+    cost: 25,
+    cooldown: 2.8,
+    icon: '⚔️',
+    unlocked: true
+  },
+  {
+    id: 'domain',
+    name: "Monarch's Domain",
+    desc: 'Inky pool empowering shadow soldiers and slowing foes (10s)',
+    cost: 40,
+    cooldown: 12.0,
+    icon: '🌌',
+    unlocked: true
   }
 ];
+
+export class ActiveMonarchDomain {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 180;
+    this.duration = 10.0;
+    this.maxDuration = 10.0;
+    this.dead = false;
+  }
+
+  update(dt, enemies, boss) {
+    this.duration -= dt;
+    if (this.duration <= 0) {
+      this.dead = true;
+      return;
+    }
+    const all = [...enemies];
+    if (boss && !boss.isDead) all.push(boss);
+
+    for (const e of all) {
+      if (e.isDead) continue;
+      const d = Math.hypot(e.x - this.x, e.y - this.y);
+      if (d < this.radius) {
+        e.vx *= 0.5;
+      }
+    }
+  }
+
+  render(ctx, camera) {
+    const rx = Math.round(this.x - camera.x);
+    const ry = Math.round(this.y - camera.y);
+    const p = Math.min(1, this.duration / this.maxDuration);
+
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.7, p * 1.2);
+
+    const grad = ctx.createRadialGradient(rx, ry + 12, 10, rx, ry + 12, this.radius);
+    grad.addColorStop(0, 'rgba(30, 8, 48, 0.9)');
+    grad.addColorStop(0.7, 'rgba(85, 20, 130, 0.45)');
+    grad.addColorStop(1, 'rgba(18, 5, 28, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry + 12, this.radius, 32, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#bb44ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry + 12, this.radius * 0.95, 30, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
 
 export class ActiveGravityWell {
   constructor(x, y) {

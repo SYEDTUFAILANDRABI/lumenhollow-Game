@@ -1,6 +1,7 @@
 import { PHYSICS, LANTERN, COLORS } from '../core/Constants.js';
 import { COMBAT } from '../systems/combat/CombatConstants.js';
 import { Projectile } from '../systems/combat/Projectile.js';
+import { PlayerSprite } from './PlayerSprite.js';
 
 export class Player {
   constructor(x = 100, y = 100) {
@@ -10,6 +11,9 @@ export class Player {
     this.vy = 0;
     this.width = 12;
     this.height = 18;
+
+    // Sprite sheet controller
+    this.sprite = new PlayerSprite();
 
     // Facing direction: 1 = right, -1 = left
     this.facing = 1;
@@ -46,11 +50,13 @@ export class Player {
 
     // Jump & Physics extensions
     this.canDoubleJump = true;
+    this.canTripleJump = false;
     this.isGliding = false;
     this.isWallSliding = false;
     this.wallDir = 0;
     this.airDashAvailable = true;
     this.isFastFalling = false;
+    this.isAstralForm = false;
 
     // Aura charging state
     this.isChargingAura = false;
@@ -140,6 +146,10 @@ export class Player {
   }
 
   update(input, tileMap, particleSystem, audioSystem, camera, combatSystem, vfx, enemies, boss, dt, shardUpgrades = {}) {
+    if (this.sprite) {
+      this.sprite.update(dt, this);
+    }
+
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer -= dt;
     }
@@ -321,7 +331,7 @@ export class Player {
       if (input.actions.left) moveDir -= 1;
       if (input.actions.right) moveDir += 1;
 
-      const speedMult = this.isEclipseForm ? COMBAT.ECLIPSE.FORM_SPEED_MULT : 1;
+      const speedMult = this.isAstralForm ? COMBAT.ASTRAL.SPEED_MULT : (this.isEclipseForm ? COMBAT.ECLIPSE.FORM_SPEED_MULT : 1);
 
       if (moveDir !== 0) {
         this.facing = moveDir;
@@ -398,6 +408,7 @@ export class Player {
           this.coyoteTimer = 0;
           this.isJumping = true;
           this.canDoubleJump = true;
+          this.canTripleJump = true;
           this.scaleX = 0.78;
           this.scaleY = 1.32;
           if (audioSystem) audioSystem.playJump();
@@ -409,6 +420,19 @@ export class Player {
           input.consumeBufferedJump();
           this.vy = PHYSICS.DOUBLE_JUMP_FORCE;
           this.canDoubleJump = false;
+          this.canTripleJump = true;
+          this.airDashAvailable = true;
+          this.scaleX = 0.8;
+          this.scaleY = 1.35;
+          if (audioSystem) audioSystem.playJump();
+          if (particleSystem) {
+            particleSystem.emitDoubleJumpBurst(this.x + this.width / 2, this.y + this.height);
+          }
+        } else if (this.canTripleJump && this.isAstralForm && !this.isPlunging) {
+          // Triple Jump in Astral Form!
+          input.consumeBufferedJump();
+          this.vy = COMBAT.ASTRAL.TRIPLE_JUMP_FORCE;
+          this.canTripleJump = false;
           this.airDashAvailable = true;
           this.scaleX = 0.8;
           this.scaleY = 1.35;
@@ -753,7 +777,7 @@ export class Player {
   }
 
   render(ctx) {
-    if (this.isDead) return;
+    if (this.isDead && (!this.sprite || this.sprite.currentAnim !== 'death')) return;
 
     if (this.invulnerableTimer > 0 && Math.floor(Date.now() / 80) % 2 === 0) {
       return;
@@ -765,10 +789,16 @@ export class Player {
     ctx.translate(centerX, bottomY);
     ctx.scale(this.facing * this.scaleX, this.scaleY);
 
+    // Render loaded pixel sprite animation from sprite sheet!
+    if (this.sprite && this.sprite.render(ctx, this)) {
+      ctx.restore();
+      return;
+    }
+
     const breathY = this.isGrounded ? Math.sin(this.animTimer * 3) * 0.5 : 0;
 
     // 1. Cloak back / shadow
-    ctx.fillStyle = this.isEclipseForm ? '#220818' : '#17142b';
+    ctx.fillStyle = this.isAstralForm ? 'rgba(18, 8, 28, 0.85)' : (this.isEclipseForm ? '#220818' : '#17142b');
     ctx.beginPath();
     ctx.moveTo(-6, -18 + breathY);
     ctx.lineTo(6, -18 + breathY);
@@ -778,7 +808,7 @@ export class Player {
     ctx.fill();
 
     // 2. Main Cloak
-    ctx.fillStyle = this.isEclipseForm ? '#48112c' : '#322254';
+    ctx.fillStyle = this.isAstralForm ? 'rgba(32, 12, 48, 0.85)' : (this.isEclipseForm ? '#48112c' : '#322254');
     ctx.beginPath();
     ctx.moveTo(-5, -17 + breathY);
     ctx.lineTo(5, -17 + breathY);
@@ -787,16 +817,16 @@ export class Player {
     ctx.closePath();
     ctx.fill();
 
-    // 3. Cloak Hem Accent
-    ctx.strokeStyle = this.isEclipseForm ? '#ff2255' : '#2a9d8f';
-    ctx.lineWidth = 1.2;
+    // 3. Cloak Hem Accent & Astral Glowing Outline
+    ctx.strokeStyle = this.isAstralForm ? '#bb44ff' : (this.isEclipseForm ? '#ff2255' : '#2a9d8f');
+    ctx.lineWidth = this.isAstralForm ? 2.0 : 1.2;
     ctx.beginPath();
     ctx.moveTo(-6 + Math.sin(this.cloakSway) * 2, -1);
     ctx.lineTo(6 + Math.sin(this.cloakSway) * 2, -1);
     ctx.stroke();
 
     // 4. Pointed Hood
-    ctx.fillStyle = this.isEclipseForm ? '#61163b' : '#442d74';
+    ctx.fillStyle = this.isAstralForm ? '#1a0926' : (this.isEclipseForm ? '#61163b' : '#442d74');
     ctx.beginPath();
     ctx.moveTo(-6, -16 + breathY);
     ctx.quadraticCurveTo(-2, -25 + breathY, 3, -24 + breathY);
@@ -805,6 +835,20 @@ export class Player {
     ctx.closePath();
     ctx.fill();
 
+    // Astral Crown of Shadow Fire on Hood
+    if (this.isAstralForm) {
+      ctx.strokeStyle = '#bb44ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-4, -24 + breathY);
+      ctx.lineTo(-6, -30 + breathY);
+      ctx.moveTo(0, -25 + breathY);
+      ctx.lineTo(0, -32 + breathY);
+      ctx.moveTo(4, -24 + breathY);
+      ctx.lineTo(6, -30 + breathY);
+      ctx.stroke();
+    }
+
     // 5. Hood Face Void
     ctx.fillStyle = '#0a0715';
     ctx.beginPath();
@@ -812,10 +856,10 @@ export class Player {
     ctx.fill();
 
     // 6. Glowing Eyes
-    const eyeColor = this.isEclipseForm ? '#ff2255' : '#f4f1ff';
+    const eyeColor = this.isAstralForm ? '#ffffff' : (this.isEclipseForm ? '#ff2255' : '#f4f1ff');
     ctx.fillStyle = eyeColor;
-    ctx.shadowColor = this.isEclipseForm ? '#ff2255' : '#7be0ad';
-    ctx.shadowBlur = this.isEclipseForm ? 8 : 4;
+    ctx.shadowColor = this.isAstralForm ? '#bb44ff' : (this.isEclipseForm ? '#ff2255' : '#7be0ad');
+    ctx.shadowBlur = this.isAstralForm ? 12 : (this.isEclipseForm ? 8 : 4);
     ctx.beginPath();
     ctx.arc(2, -16.5 + breathY, 1.2, 0, Math.PI * 2);
     ctx.fill();
@@ -847,7 +891,11 @@ export class Player {
 
     // Glowing Lantern Core
     const glowGrad = ctx.createRadialGradient(lanternRelX, lanternRelY + 3.5, 0.5, lanternRelX, lanternRelY + 3.5, 4);
-    if (this.isEclipseForm) {
+    if (this.isAstralForm) {
+      glowGrad.addColorStop(0, '#ffffff');
+      glowGrad.addColorStop(0.5, '#bb44ff');
+      glowGrad.addColorStop(1, '#551188');
+    } else if (this.isEclipseForm) {
       glowGrad.addColorStop(0, '#ffffff');
       glowGrad.addColorStop(0.4, '#ff2255');
       glowGrad.addColorStop(1, '#881144');

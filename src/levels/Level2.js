@@ -1,9 +1,9 @@
 // Level 2: Crystal Caverns
-// Darker depths with Shadow Wisps and Moon-Glass chasms
+// Darker depths with Skeletons, Fire Imps, and Moon-Glass chasms
 
 export const Level2Data = {
   name: "Crystal Caverns",
-  subtitle: "Time your slashes to parry enemy strikes • Build Eclipse Meter",
+  subtitle: "Time your slashes to parry • Extract souls with [F] • Build Shadow Energy",
   index: 1,
   ambientDarkness: 0.94,
   ascii: [
@@ -12,12 +12,12 @@ export const Level2Data = {
     "#                                                                              #",
     "#                                         *                                    #",
     "#                                      #######                                 #",
-    "#                  C                                                           #",
+    "#                  C                                4                          #",
     "#               _______                 MMMM                                   #",
+    "#                                                               2              #",
+    "#             ###                    MMMM                     #####            #",
     "#                                                                              #",
-    "#             ###                    MMMM                                      #",
-    "#                                                                              #",
-    "#       F                   S                           W                      #",
+    "#       F                   S                           1                      #",
     "#     #####               #####                       _____                    #",
     "#                                                                              #",
     "#             MMMM                                              #####          #",
