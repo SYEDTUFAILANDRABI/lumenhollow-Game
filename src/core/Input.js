@@ -1,3 +1,6 @@
+import { Settings } from './settingsManager/SettingsManager.js';
+import { Gamepad } from './input/GamepadManager.js';
+
 export class Input {
   constructor() {
     this.keys = new Map();
@@ -148,37 +151,73 @@ export class Input {
       this.jumpBufferTimer -= dt;
     }
 
+    // Poll Gamepad
+    const gp = Gamepad.update();
+
     const k = (code) => !!this.keys.get(code);
     const jp = (code) => this.justPressed.has(code);
     const jr = (code) => this.justReleased.has(code);
 
-    const left = k('ArrowLeft') || k('KeyA') || !!this.touchLeft;
-    const right = k('ArrowRight') || k('KeyD') || !!this.touchRight;
-    const down = k('ArrowDown') || k('KeyS');
+    const bindings = Settings.get('keyBindings') || {};
+    const checkKeyHold = (action, defaultKeys = []) => {
+      const keys = bindings[action] || defaultKeys;
+      return keys.some(code => k(code));
+    };
+    const checkKeyJustPressed = (action, defaultKeys = []) => {
+      const keys = bindings[action] || defaultKeys;
+      return keys.some(code => jp(code));
+    };
+    const checkKeyJustReleased = (action, defaultKeys = []) => {
+      const keys = bindings[action] || defaultKeys;
+      return keys.some(code => jr(code));
+    };
 
-    const jump = k('Space') || k('KeyW') || k('ArrowUp') || !!this.touchJump;
-    const jumpJustPressed = jp('Space') || jp('KeyW') || jp('ArrowUp') || !!this.touchJumpJustPressed;
-    const jumpJustReleased = jr('Space') || jr('KeyW') || jr('ArrowUp') || !!this.touchJumpJustReleased;
+    const left = checkKeyHold('moveLeft', ['ArrowLeft', 'KeyA']) || !!this.touchLeft || (gp && gp.left);
+    const right = checkKeyHold('moveRight', ['ArrowRight', 'KeyD']) || !!this.touchRight || (gp && gp.right);
+    const down = checkKeyHold('crouch', ['ArrowDown', 'KeyS']) || (gp && gp.down);
 
-    const pulse = k('ShiftLeft') || k('ShiftRight') || k('KeyK') || !!this.touchPulse;
+    const jump = checkKeyHold('jump', ['Space', 'KeyW', 'ArrowUp']) || !!this.touchJump || (gp && gp.jump);
+    const jumpJustPressed = checkKeyJustPressed('jump', ['Space', 'KeyW', 'ArrowUp']) || !!this.touchJumpJustPressed || (gp && gp.jumpJustPressed);
+    const jumpJustReleased = checkKeyJustReleased('jump', ['Space', 'KeyW', 'ArrowUp']) || !!this.touchJumpJustReleased;
+
+    // Toggle pulse support (accessibility)
+    const togglePulseSetting = Settings.get('togglePulse');
+    if (togglePulseSetting) {
+      if (checkKeyJustPressed('pulse', ['ShiftLeft', 'ShiftRight', 'KeyK']) || (gp && gp.pulseJustPressed)) {
+        this.togglePulseState = !this.togglePulseState;
+      }
+    } else {
+      this.togglePulseState = false;
+    }
+    const pulse = togglePulseSetting ? this.togglePulseState : (checkKeyHold('pulse', ['ShiftLeft', 'ShiftRight', 'KeyK']) || !!this.touchPulse || (gp && gp.pulse));
 
     // Combat moves & Aura
-    const slashJustPressed = jp('KeyJ') || !!this.touchSlashJustPressed;
-    const boltJustPressed = jp('KeyL') || !!this.touchBoltJustPressed;
-    const dashJustPressed = jp('KeyC') || jp('ControlLeft') || jp('ControlRight') || !!this.touchDashJustPressed;
-    const plungeJustPressed = (down && jp('KeyS')) || (down && jp('ArrowDown')) || !!this.touchPlungeJustPressed;
-    const auraJustPressed = jp('KeyQ') || !!this.touchAuraJustPressed;
-    const auraHold = k('KeyQ') || !!this.touchAuraHold;
+    const slashJustPressed = checkKeyJustPressed('slash', ['KeyJ']) || !!this.touchSlashJustPressed || (gp && gp.slashJustPressed);
+    const boltJustPressed = checkKeyJustPressed('bolt', ['KeyL']) || !!this.touchBoltJustPressed || (gp && gp.boltJustPressed);
+    const dashJustPressed = checkKeyJustPressed('dash', ['KeyC', 'ControlLeft']) || !!this.touchDashJustPressed || (gp && gp.dashJustPressed);
+    const plungeJustPressed = (down && checkKeyJustPressed('plunge', ['KeyS', 'ArrowDown'])) || !!this.touchPlungeJustPressed;
 
-    const pauseJustPressed = jp('Escape') || jp('KeyP');
+    // Toggle aura support (accessibility)
+    const toggleAuraSetting = Settings.get('toggleAura');
+    if (toggleAuraSetting) {
+      if (checkKeyJustPressed('aura', ['KeyQ'])) {
+        this.toggleAuraState = !this.toggleAuraState;
+      }
+    } else {
+      this.toggleAuraState = false;
+    }
+    const auraJustPressed = checkKeyJustPressed('aura', ['KeyQ']) || !!this.touchAuraJustPressed || (gp && gp.auraJustPressed);
+    const auraHold = toggleAuraSetting ? this.toggleAuraState : (checkKeyHold('aura', ['KeyQ']) || !!this.touchAuraHold || (gp && gp.auraHold));
+
+    const pauseJustPressed = checkKeyJustPressed('pause', ['Escape', 'KeyP']) || (gp && gp.pauseJustPressed);
     const muteJustPressed = jp('KeyM');
-    const interactJustPressed = jp('KeyE') || jp('Enter');
+    const interactJustPressed = checkKeyJustPressed('summon', ['KeyE']) || jp('Enter');
     const f2JustPressed = jp('F2');
     const skillsJustPressed = jp('Tab') || !!this.touchSkillsJustPressed;
 
     // Summoning
-    const summonJustPressed = jp('KeyE') || !!this.touchSummonJustPressed;
-    const summonHold = k('KeyE');
+    const summonJustPressed = checkKeyJustPressed('summon', ['KeyE']) || !!this.touchSummonJustPressed || (gp && gp.summonJustPressed);
+    const summonHold = checkKeyHold('summon', ['KeyE']);
     const summonQuick1 = jp('Digit1');
     const summonQuick2 = jp('Digit2');
     const summonQuick3 = jp('Digit3');
@@ -186,18 +225,18 @@ export class Input {
     const summonQuick5 = jp('Digit5');
 
     // Swappable skills (U, I, O)
-    const skillSlot1 = jp('KeyU') || !!this.touchSkill1JustPressed;
-    const skillSlot2 = jp('KeyI') || !!this.touchSkill2JustPressed;
-    const skillSlot3 = jp('KeyO') || !!this.touchSkill3JustPressed;
+    const skillSlot1 = checkKeyJustPressed('skill1', ['KeyU']) || !!this.touchSkill1JustPressed;
+    const skillSlot2 = checkKeyJustPressed('skill2', ['KeyI']) || !!this.touchSkill2JustPressed;
+    const skillSlot3 = checkKeyJustPressed('skill3', ['KeyO']) || !!this.touchSkill3JustPressed;
 
-    // Astral Form & Shadow Army (R, F, G, X, V, T)
-    const astralJustPressed = jp('KeyR') || !!this.touchAstralJustPressed;
-    const extractJustPressed = jp('KeyF') || !!this.touchExtractJustPressed;
-    const riseHold = k('KeyG') || !!this.touchRiseHold;
-    const riseJustPressed = jp('KeyG') || !!this.touchRiseJustPressed;
-    const exchangeJustPressed = jp('KeyX') || !!this.touchExchangeJustPressed;
-    const reachHold = k('KeyV') || !!this.touchReachHold;
-    const ledgerJustPressed = jp('KeyT') || !!this.touchLedgerJustPressed;
+    // Astral Form & Shadow Army
+    const astralJustPressed = checkKeyJustPressed('astral', ['KeyR']) || !!this.touchAstralJustPressed;
+    const extractJustPressed = checkKeyJustPressed('extract', ['KeyF']) || !!this.touchExtractJustPressed;
+    const riseHold = checkKeyHold('rise', ['KeyG']) || !!this.touchRiseHold;
+    const riseJustPressed = checkKeyJustPressed('rise', ['KeyG']) || !!this.touchRiseJustPressed;
+    const exchangeJustPressed = checkKeyJustPressed('exchange', ['KeyX']) || !!this.touchExchangeJustPressed;
+    const reachHold = checkKeyHold('reach', ['KeyV']) || !!this.touchReachHold;
+    const ledgerJustPressed = checkKeyJustPressed('ledger', ['KeyT']) || !!this.touchLedgerJustPressed;
 
     this.actions = {
       left,

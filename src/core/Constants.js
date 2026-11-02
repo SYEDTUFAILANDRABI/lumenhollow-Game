@@ -2,6 +2,56 @@ export const GAME_WIDTH = 640;
 export const GAME_HEIGHT = 360;
 export const TILE_SIZE = 20;
 
+// Studio branding (easily customizable in one location)
+export const STUDIO_NAME = "Your Studio Name";
+
+export const SCENE_STATES = {
+  BOOT: 'BOOT',
+  SPLASH: 'SPLASH',
+  PRESS_KEY: 'PRESS_KEY',
+  INTRO_CINEMATIC: 'INTRO_CINEMATIC',
+  TITLE: 'TITLE',
+  MAIN_MENU: 'MAIN_MENU',
+  PLAYING: 'PLAYING',
+  PAUSED: 'PAUSED',
+  TRANSITION: 'TRANSITION',
+  LEVEL_RESULTS: 'LEVEL_RESULTS',
+  FINALE_CINEMATIC: 'FINALE_CINEMATIC',
+  CREDITS: 'CREDITS',
+  WIN: 'WIN'
+};
+
+export const DIFFICULTY_SETTINGS = {
+  Gentle: {
+    name: 'Gentle',
+    enemyHpMultiplier: 0.7,
+    enemyDamageMultiplier: 0.6,
+    enemySpeedMultiplier: 0.85,
+    description: 'A forgiving experience focused on exploration and atmosphere.'
+  },
+  Normal: {
+    name: 'Normal',
+    enemyHpMultiplier: 1.0,
+    enemyDamageMultiplier: 1.0,
+    enemySpeedMultiplier: 1.0,
+    description: 'The standard intended balance of combat and platforming.'
+  },
+  Hard: {
+    name: 'Hard',
+    enemyHpMultiplier: 1.35,
+    enemyDamageMultiplier: 1.3,
+    enemySpeedMultiplier: 1.15,
+    description: 'Deadlier foes with increased aggression and endurance.'
+  },
+  Nightmare: {
+    name: 'Nightmare',
+    enemyHpMultiplier: 1.7,
+    enemyDamageMultiplier: 1.6,
+    enemySpeedMultiplier: 1.3,
+    description: 'Relentless enemies. Only for master platformers and fighters.'
+  }
+};
+
 export const COLORS = {
   VOID: '#090814',
   DEEP_INDIGO: '#1b1a3a',

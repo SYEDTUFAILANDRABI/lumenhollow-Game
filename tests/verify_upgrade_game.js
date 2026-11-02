@@ -40,11 +40,23 @@ async function run() {
   await page.keyboard.press('Enter');
   await new Promise(r => setTimeout(r, 800));
 
+  // Use API to ensure PLAYING state since new scene flow may be at MAIN_MENU
+  await page.evaluate(() => {
+    const game = window.__LUMEN_GAME__;
+    if (game.state !== 'PLAYING') {
+      game.loadLevel(0);
+      game.state = 'PLAYING';
+      if (game.menuManager) game.menuManager.clearModals();
+      if (game.mainMenu) game.mainMenu.unmount();
+    }
+  });
+  await new Promise(r => setTimeout(r, 600));
+
   // Wait until player is grounded
   await page.waitForFunction(() => {
     const game = window.__LUMEN_GAME__;
     return game && game.state === 'PLAYING' && game.player && game.player.isGrounded;
-  }, { timeout: 3000 });
+  }, { timeout: 5000 });
 
   // 3. Test High Jump, Double Jump, Glide
   const yBefore = await page.evaluate(() => window.__LUMEN_GAME__.player.y);

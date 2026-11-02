@@ -143,6 +143,10 @@ export class PlayerSprite {
     };
   }
 
+  isLoaded() {
+    return this.loaded && this.image.complete && this.image.naturalWidth > 0;
+  }
+
   setAnimation(name, restart = false) {
     if (this.currentAnim === name && !restart) return;
     this.currentAnim = name;

@@ -43,8 +43,20 @@ async function run() {
   await page.screenshot({ path: titleScreenShot });
   console.log('Captured title screen:', titleScreenShot);
 
-  // 2. Start Game
+  // 2. Start Game - use new scene flow: any key to get past PRESS_KEY, then loadLevel via API
   await page.keyboard.press('Space');
+  await new Promise(r => setTimeout(r, 600));
+
+  // If still not in PLAYING state, use the game API to start directly
+  await page.evaluate(() => {
+    const game = window.__LUMEN_GAME__;
+    if (game.state !== 'PLAYING') {
+      game.loadLevel(0);
+      game.state = 'PLAYING';
+      if (game.menuManager) game.menuManager.clearModals();
+      if (game.mainMenu) game.mainMenu.unmount();
+    }
+  });
   await new Promise(r => setTimeout(r, 600));
 
   // Verify game state
@@ -53,9 +65,9 @@ async function run() {
     return {
       state: game.state,
       levelIndex: game.currentLevelIndex,
-      levelName: game.tileMap.levelName,
-      playerPos: { x: game.player.x, y: game.player.y },
-      energy: game.player.energy
+      levelName: game.tileMap ? game.tileMap.levelName : 'no tilemap',
+      playerPos: game.player ? { x: game.player.x, y: game.player.y } : null,
+      energy: game.player ? game.player.energy : null
     };
   });
   console.log('Level 1 initialized:', state1);

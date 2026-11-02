@@ -1,4 +1,5 @@
 import { Storage } from '../core/Storage.js';
+import { Settings } from '../core/settingsManager/SettingsManager.js';
 
 export class AudioSystem {
   constructor() {
@@ -8,14 +9,39 @@ export class AudioSystem {
     this.masterLowpass = null;
     this.sfxGain = null;
     this.musicGain = null;
+    this.uiGain = null;
+    this.ambienceGain = null;
     this.reverbNode = null;
     this.reverbGain = null;
 
-    const saved = Storage.load();
-    this.isMuted = saved.muted || false;
-    this.sfxVolume = saved.sfxVolume !== undefined ? saved.sfxVolume : 0.85;
-    this.musicVolume = saved.musicVolume !== undefined ? saved.musicVolume : 0.70;
+    this.isMuted = Settings.get('muted') || false;
+    this.masterVolume = Settings.get('masterVolume') !== undefined ? Settings.get('masterVolume') : 0.85;
+    this.sfxVolume = Settings.get('sfxVolume') !== undefined ? Settings.get('sfxVolume') : 0.85;
+    this.musicVolume = Settings.get('musicVolume') !== undefined ? Settings.get('musicVolume') : 0.70;
+    this.uiVolume = Settings.get('uiVolume') !== undefined ? Settings.get('uiVolume') : 0.80;
+    this.ambienceVolume = Settings.get('ambienceVolume') !== undefined ? Settings.get('ambienceVolume') : 0.75;
     this.initialized = false;
+
+    // Listen to Settings changes
+    Settings.on('masterVolume', (v) => this.setMasterVolume(v));
+    Settings.on('musicVolume', (v) => this.setMusicVolume(v));
+    Settings.on('sfxVolume', (v) => this.setSfxVolume(v));
+    Settings.on('uiVolume', (v) => this.setUIVolume(v));
+    Settings.on('ambienceVolume', (v) => this.setAmbienceVolume(v));
+    Settings.on('muted', (m) => this.setMuted(m));
+
+    // Mute on tab blur if enabled
+    window.addEventListener('blur', () => {
+      if (Settings.get('muteOnBlur') && this.masterGain && this.ctx) {
+        this.masterGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+      }
+    });
+    window.addEventListener('focus', () => {
+      if (this.masterGain && this.ctx) {
+        const target = this.isMuted ? 0 : this.masterVolume * 0.75;
+        this.masterGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
+      }
+    });
 
     // Ambient pad state
     this.padOscs = [];
@@ -55,12 +81,18 @@ export class AudioSystem {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.70, this.ctx.currentTime);
 
-      // Dedicated SFX and Music buses
+      // Dedicated SFX, Music, UI, and Ambience buses
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
 
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+
+      this.uiGain = this.ctx.createGain();
+      this.uiGain.gain.setValueAtTime(this.uiVolume, this.ctx.currentTime);
+
+      this.ambienceGain = this.ctx.createGain();
+      this.ambienceGain.gain.setValueAtTime(this.ambienceVolume, this.ctx.currentTime);
 
       // Procedural Convolution Reverb (soft noise decaying impulse)
       this.reverbNode = this.createReverbNode();
@@ -74,6 +106,8 @@ export class AudioSystem {
       // Audio Graph routing
       this.sfxGain.connect(this.masterLowpass);
       this.musicGain.connect(this.masterLowpass);
+      this.uiGain.connect(this.masterLowpass);
+      this.ambienceGain.connect(this.masterLowpass);
       this.masterLowpass.connect(this.masterCompressor);
       this.masterCompressor.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
@@ -127,6 +161,186 @@ export class AudioSystem {
       this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.70, t, 0.04);
     }
     return this.isMuted;
+  }
+
+  setMasterVolume(val) {
+    this.masterVolume = Math.max(0, Math.min(1, Math.round(val * 100) / 100));
+    if (this.masterGain && this.ctx) {
+      const t = this.ctx.currentTime;
+      const target = this.isMuted ? 0 : this.masterVolume * 0.75;
+      this.masterGain.gain.cancelScheduledValues(t);
+      this.masterGain.gain.setTargetAtTime(target, t, 0.05);
+    }
+  }
+
+  setMuted(muted) {
+    this.isMuted = !!muted;
+    if (this.masterGain && this.ctx) {
+      const t = this.ctx.currentTime;
+      const target = this.isMuted ? 0 : this.masterVolume * 0.75;
+      this.masterGain.gain.cancelScheduledValues(t);
+      this.masterGain.gain.setTargetAtTime(target, t, 0.04);
+    }
+  }
+
+  setUIVolume(val) {
+    this.uiVolume = Math.max(0, Math.min(1, Math.round(val * 100) / 100));
+    if (this.uiGain && this.ctx) {
+      const t = this.ctx.currentTime;
+      this.uiGain.gain.cancelScheduledValues(t);
+      this.uiGain.gain.setTargetAtTime(this.uiVolume, t, 0.05);
+    }
+  }
+
+  setAmbienceVolume(val) {
+    this.ambienceVolume = Math.max(0, Math.min(1, Math.round(val * 100) / 100));
+    if (this.ambienceGain && this.ctx) {
+      const t = this.ctx.currentTime;
+      this.ambienceGain.gain.cancelScheduledValues(t);
+      this.ambienceGain.gain.setTargetAtTime(this.ambienceVolume, t, 0.05);
+    }
+  }
+
+  setSfxVolume(val) {
+    this.setSFXVolume(val);
+  }
+
+  // Soft, warm UI sounds (no shrill beeps, strictly matching calming aesthetics)
+  playUIHover() {
+    this.ensureContext();
+    if (!this.ctx || !this.uiGain || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, t); // A5
+      osc.frequency.exponentialRampToValueAtTime(1108.73, t + 0.04); // C#6
+
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.04, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+
+      osc.connect(gain);
+      gain.connect(this.uiGain);
+
+      osc.start(t);
+      osc.stop(t + 0.06);
+    } catch (e) {}
+  }
+
+  playUIClick() {
+    this.ensureContext();
+    if (!this.ctx || !this.uiGain || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, t); // C5
+      osc.frequency.exponentialRampToValueAtTime(659.25, t + 0.06); // E5
+
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.09, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+
+      osc.connect(gain);
+      gain.connect(this.uiGain);
+
+      osc.start(t);
+      osc.stop(t + 0.10);
+    } catch (e) {}
+  }
+
+  playAudioTest() {
+    this.ensureContext();
+    if (!this.ctx || !this.uiGain || this.isMuted) return;
+    try {
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      const t = this.ctx.currentTime;
+      notes.forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + idx * 0.08);
+
+        gain.gain.setValueAtTime(0, t + idx * 0.08);
+        gain.gain.linearRampToValueAtTime(0.08, t + idx * 0.08 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + idx * 0.08 + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.uiGain);
+
+        osc.start(t + idx * 0.08);
+        osc.stop(t + idx * 0.08 + 0.38);
+      });
+    } catch (e) {}
+  }
+
+  playMenuMusic() {
+    this.ensureContext();
+    if (!this.ctx) return;
+    // Play warm ethereal celestial chords for title and menus (Eb maj9 / Bb maj7)
+    const menuChord = [155.56, 196.00, 233.08, 293.66, 349.23]; // Eb3, G3, Bb3, D4, F4
+    const t = this.ctx.currentTime;
+    for (const osc of this.padOscs) {
+      try { osc.stop(t + 0.8); } catch (e) {}
+    }
+    this.padOscs = [];
+
+    for (let i = 0; i < menuChord.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
+      osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(menuChord[i], t);
+      osc.detune.setValueAtTime((Math.random() - 0.5) * 6, t);
+
+      oscGain.gain.setValueAtTime(0, t);
+      oscGain.gain.linearRampToValueAtTime(0.24 / menuChord.length, t + 2.0);
+
+      osc.connect(oscGain);
+      oscGain.connect(this.padFilter || this.musicGain);
+
+      osc.start(t);
+      this.padOscs.push(osc);
+    }
+  }
+
+  playIntroSwell() {
+    this.ensureContext();
+    if (!this.ctx || !this.musicGain || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc1.type = 'sawtooth';
+      osc2.type = 'sine';
+      osc1.frequency.setValueAtTime(110, t); // A2
+      osc2.frequency.setValueAtTime(220, t); // A3
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(150, t);
+      filter.frequency.exponentialRampToValueAtTime(1600, t + 4.5);
+
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 3.0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 6.0);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicGain);
+
+      osc1.start(t);
+      osc2.start(t);
+      osc1.stop(t + 6.2);
+      osc2.stop(t + 6.2);
+    } catch (e) {}
   }
 
   setSFXVolume(val) {
