@@ -39,7 +39,12 @@ export class LevelResultsScene {
 
   update(dt, input) {
     this.timer += dt;
-    if (this.timer > 3.0 && input && (input.jumpJustPressed || input.interactJustPressed)) {
+    // Allow continue after 2.5 seconds via jump, interact, or any confirm key
+    if (this.timer > 2.5 && input && (
+      input.jumpJustPressed ||
+      input.interactJustPressed ||
+      input.pauseJustPressed
+    )) {
       this.proceed();
     }
   }

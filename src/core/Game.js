@@ -462,6 +462,9 @@ export class Game {
   }
 
   update(dt) {
+    // Always update input so JustPressed flags are fresh in every scene state
+    this.input.update(dt);
+
     // 1. Scene Flow States
     if (this.state === SCENE_STATES.BOOT) {
       this.bootScene.update(dt);
@@ -531,7 +534,7 @@ export class Game {
 
     // 2. In-Game State (PLAYING)
     this.stageElapsed += dt;
-    this.input.update(dt);
+    // (input.update already called at top of update())
 
     // Check Pause
     if (this.input.actions.pauseJustPressed) {
