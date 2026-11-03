@@ -33,6 +33,11 @@ export class CreditsScene {
       { text: I18n.t('credits_footer'), font: 'italic 14px', color: '#7be0ad', spacing: 60 },
       { text: "PRESS SPACE OR ESCAPE TO RETURN", font: 'bold 11px', color: 'rgba(255, 217, 138, 0.75)', spacing: 20 }
     ];
+
+    // Play emotional vocal soundtrack during the credits roll
+    if (this.game && this.game.audio) {
+      this.game.audio.playThemeTrack(false);
+    }
   }
 
   update(dt, input) {
@@ -50,6 +55,9 @@ export class CreditsScene {
 
   finish() {
     this.isDone = true;
+    if (this.game && this.game.audio) {
+      this.game.audio.playMenuMusic();
+    }
     this.game.returnToMainMenu();
   }
 

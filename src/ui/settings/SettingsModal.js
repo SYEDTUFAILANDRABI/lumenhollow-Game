@@ -287,6 +287,17 @@ export class SettingsModal {
 
       <div class="setting-item">
         <div>
+          <div class="setting-label">Vocal Theme Soundtrack</div>
+          <div class="setting-desc">Play ethereal vocal hymn for Title, Menus & Credits</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="set-vocalSoundtrack" ${Settings.get('vocalSoundtrack') !== false ? 'checked' : ''} />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div>
           <div class="setting-label">${I18n.t('master_vol')}</div>
           <div class="setting-desc">${Math.round(Settings.get('masterVolume') * 100)}%</div>
         </div>

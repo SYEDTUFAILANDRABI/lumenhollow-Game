@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS = {
   muted: false,
   muteOnBlur: true,
   monoAudio: false,
+  vocalSoundtrack: true,
 
   // Controls (Primary & Secondary keys)
   keyBindings: {

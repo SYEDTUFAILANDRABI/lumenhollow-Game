@@ -29,6 +29,11 @@ export class AudioSystem {
     Settings.on('uiVolume', (v) => this.setUIVolume(v));
     Settings.on('ambienceVolume', (v) => this.setAmbienceVolume(v));
     Settings.on('muted', (m) => this.setMuted(m));
+    Settings.on('vocalSoundtrack', () => {
+      if (this.currentLevelIndex === -1) {
+        this.playMenuMusic();
+      }
+    });
 
     // Mute on tab blur if enabled
     window.addEventListener('blur', () => {
@@ -42,6 +47,12 @@ export class AudioSystem {
         this.masterGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
       }
     });
+
+    // Vocal soundtrack track state
+    this.themeAudio = null;
+    this.themeSource = null;
+    this.isThemePlaying = false;
+    this.soundtrackUrl = '/assets/audio/lumen_hollow_theme.mp3';
 
     // Ambient pad state
     this.padOscs = [];
@@ -279,7 +290,70 @@ export class AudioSystem {
     } catch (e) {}
   }
 
+  playThemeTrack(loop = true) {
+    this.ensureContext();
+    if (!this.ctx || !this.musicGain) return;
+
+    // Fade out any synth pad oscillators
+    const t = this.ctx.currentTime;
+    for (const osc of this.padOscs) {
+      try { osc.stop(t + 0.5); } catch (e) {}
+    }
+    this.padOscs = [];
+
+    if (!this.themeAudio && typeof Audio !== 'undefined') {
+      try {
+        this.themeAudio = new Audio(this.soundtrackUrl);
+        this.themeAudio.loop = loop;
+        this.themeAudio.crossOrigin = 'anonymous';
+        this.themeAudio.preload = 'auto';
+
+        this.themeSource = this.ctx.createMediaElementSource(this.themeAudio);
+        this.themeSource.connect(this.musicGain);
+      } catch (e) {
+        console.warn('Theme audio source initialization deferred:', e);
+      }
+    }
+
+    if (this.themeAudio) {
+      this.themeAudio.loop = loop;
+      this.isThemePlaying = true;
+      const playPromise = this.themeAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Fall back gracefully to procedural synth pad if autoplay blocked or audio driver missing
+          this.playMenuSynthMusic();
+        });
+      }
+    } else {
+      this.playMenuSynthMusic();
+    }
+  }
+
+  stopThemeTrack(fadeTime = 0.8) {
+    if (this.themeAudio && this.isThemePlaying) {
+      this.isThemePlaying = false;
+      try {
+        this.themeAudio.pause();
+      } catch (e) {}
+    }
+  }
+
   playMenuMusic() {
+    this.ensureContext();
+    if (!this.ctx) return;
+    this.currentLevelIndex = -1;
+
+    const useVocal = Settings.get('vocalSoundtrack') !== false;
+    if (useVocal) {
+      this.playThemeTrack(true);
+    } else {
+      this.stopThemeTrack(0.3);
+      this.playMenuSynthMusic();
+    }
+  }
+
+  playMenuSynthMusic() {
     this.ensureContext();
     if (!this.ctx) return;
     // Play warm ethereal celestial chords for title and menus (Eb maj9 / Bb maj7)
@@ -382,6 +456,9 @@ export class AudioSystem {
     this.ensureContext();
     if (!this.ctx || this.currentLevelIndex === levelIndex) return;
     this.currentLevelIndex = levelIndex;
+
+    // Stop vocal soundtrack theme when entering a gameplay stage
+    this.stopThemeTrack(0.8);
 
     // Chords per level
     // 0: D minor (mystical forest)
