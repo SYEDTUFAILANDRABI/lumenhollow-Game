@@ -1,6 +1,7 @@
 export const GAME_WIDTH = 640;
 export const GAME_HEIGHT = 360;
 export const TILE_SIZE = 20;
+export const MULTIPLAYER_ENABLED = true;
 
 // Studio branding (easily customizable in one location)
 export const STUDIO_NAME = "Your Studio Name";

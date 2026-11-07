@@ -8,7 +8,9 @@
 ## 🚀 Quick Reference Commands
 
 - **Run Dev Server**: `npm run dev` (starts Vite on `http://localhost:5173/`)
+- **Run Relay Server**: `npm run server` (starts WebSocket relay server on `http://localhost:3000/`)
 - **Quick Launch Script**: Run `run_game.bat` or `play.bat` (Windows)
+- **Run Multiplayer Co-Op Test**: `node tests/verify_multiplayer.js`
 - **Run Full Menu & Settings Test**: `node tests/verify_menu_settings_system.js`
 - **Run Combat, Summons & Skills Test**: `node tests/verify_upgrade_game.js`
 - **Run Boss & Skeleton Sprites Test**: `node tests/verify_boss_and_skeleton_sprites.js`
@@ -126,6 +128,10 @@ When calling these functions, always preserve their exact parameter orders:
 
 ## 📁 Source Code Organization
 
+- `server/`: Node.js WebSocket relay and matchmaking server (`server.js`, `RoomManager.js`, `Matchmaker.js`)
+- `shared/`: Network protocol schema, version constant, bitmasks, player palettes
+- `src/net/`: Network session coordinator, transports (`NullTransport`, `LoopbackTransport`, `WebSocketTransport`), `PlayerManager.js`, `Prediction.js`, `Interpolation.js`
+- `src/ui/party/`: Co-op Party lobby modal, in-game Party HUD, Ping radial wheel, Chat box
 - `src/core/`: Game loop, constants, camera, inputs, save slots (`SaveManager.js`), settings (`SettingsManager.js`), localization (`I18n.js`)
 - `src/entities/`: `Player.js`, `PlayerSprite.js`, `FireflyCompanion.js`, platforms, shrines, and enemies/bosses
 - `src/levels/`: ASCII levels 1 to 6 and `TileMap.js` engine
@@ -138,7 +144,8 @@ When calling these functions, always preserve their exact parameter orders:
 
 ## 🧪 Current Verification Status
 
-All 5 test suites pass with **0 console errors**:
+All 6 test suites pass with **0 console errors**:
+- ✅ `tests/verify_multiplayer.js` (E2E Host/Peer room creation, join, ready-up, replication, chat, pings, wisp/revive)
 - ✅ `tests/verify_game.js`
 - ✅ `tests/verify_upgrade_game.js`
 - ✅ `tests/verify_boss_and_skeleton_sprites.js`

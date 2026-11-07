@@ -43,6 +43,11 @@ export class MainMenu {
         <span style="font-size: 12px; color: #2a9d8f;">✦</span>
       </button>
 
+      <button id="btn-menu-multiplayer" class="menu-btn" style="border-color: rgba(126, 184, 218, 0.6); box-shadow: 0 0 10px rgba(126, 184, 218, 0.2);">
+        <span>PLAY TOGETHER (CO-OP)</span>
+        <span style="font-size: 12px; color: #7eb8da;">👥</span>
+      </button>
+
       <button id="btn-menu-load" class="menu-btn">
         <span>${I18n.t('menu_load_game')}</span>
         <span style="font-size: 12px;">📁</span>
@@ -116,6 +121,12 @@ export class MainMenu {
 
     bind('btn-menu-new', () => {
       this.game.openSaveSlotsModal('new');
+    });
+
+    bind('btn-menu-multiplayer', () => {
+      if (this.game.openPartyModal) {
+        this.game.openPartyModal();
+      }
     });
 
     bind('btn-menu-load', () => {

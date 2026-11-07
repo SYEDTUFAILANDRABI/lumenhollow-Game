@@ -64,7 +64,8 @@ Game  →  Pause Menu  →  Resume / Restart / Quit
 ## 🖥️ Main Menu Options
 
 - **Continue** — load most recent save slot
-- **New Game** — start from level 1 (3 save slots)
+- **New Game**
+- **Play Together (Co-Op)** — open celestial expedition lobby (Duo 2P / Squad 4P) — start from level 1 (3 save slots)
 - **Load Game** — select from 3 save slots (with thumbnail, playtime, date)
 - **Level Select** — jump to any unlocked level (best time, shard count, rank shown)
 - **Skills & Loadout** — skill swap menu
@@ -93,6 +94,26 @@ All settings apply **instantly** and are saved to `localStorage`.
 | **Data** | Export save data (JSON), import save data, delete save slot, reset settings |
 
 > **Auto-preset**: On first launch, a quick performance benchmark runs and recommends Low/Medium/High/Ultra automatically.
+
+---
+
+## 👥 Online Co-Op Multiplayer (Solo, Duo, Squad)
+
+Play cooperatively with up to 4 players online!
+- **Topology**: Host-authoritative client relay. Zero heavy server simulation needed; host simulates physics, clients run client-side prediction and snapshot interpolation.
+- **Relay Server**: Lightweight Node.js server (server/server.js) with only the ws package. Client has zero runtime dependencies.
+- **Lobby & Matchmaking**:
+  - 6-character room codes (e.g. JGWV6Z)
+  - Shareable invite links (?room=CODE)
+  - Quick Play automated matchmaking queue
+  - 4 customizable character cloaks: Dusk Gold, Azure Celestial, Emerald Wood, Crimson Eclipse
+- **Co-Op Gameplay Mechanics**:
+  - **Celestial Wisp & Revive**: Downed players become hovering celestial wisps that drift toward teammates. Living players hold **Pulse** (Shift or K) within 45px to channel life energy and revive them.
+  - **Shared Bounding Camera**: Smooth dynamic framing tracking the centroid of all living teammates.
+  - **Contextual Ping Radial Wheel (Z)**: 4 pings (Group Up, Danger, Need Help, Shard) leaving animated holographic beacons in the world.
+  - **In-Game Chat (Enter)**: Real-time team communication with rate limiting and auto-fading log.
+  - **Dynamic Scaling**: Enemy and boss health scale with active party size ([1.0, 1.6, 2.2, 2.8]).
+  - **Loopback Testing Mode**: Built-in LoopbackTransport allows simulating 2–4 players locally with artificial latency and packet loss.
 
 ---
 

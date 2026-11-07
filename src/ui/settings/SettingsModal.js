@@ -31,6 +31,7 @@ export class SettingsModal {
           <button class="settings-tab-btn ${this.activeTab === 'audio' ? 'active' : ''}" data-tab="audio">${I18n.t('tab_audio')}</button>
           <button class="settings-tab-btn ${this.activeTab === 'controls' ? 'active' : ''}" data-tab="controls">${I18n.t('tab_controls')}</button>
           <button class="settings-tab-btn ${this.activeTab === 'accessibility' ? 'active' : ''}" data-tab="accessibility">${I18n.t('tab_accessibility')}</button>
+          <button class="settings-tab-btn ${this.activeTab === 'network' ? 'active' : ''}" data-tab="network">Network</button>
           <button class="settings-tab-btn ${this.activeTab === 'language' ? 'active' : ''}" data-tab="language">${I18n.t('tab_language')}</button>
           <button class="settings-tab-btn ${this.activeTab === 'data' ? 'active' : ''}" data-tab="data">${I18n.t('tab_data')}</button>
         </div>
@@ -78,6 +79,9 @@ export class SettingsModal {
         break;
       case 'accessibility':
         content.innerHTML = this.renderAccessibilityTab();
+        break;
+      case 'network':
+        content.innerHTML = this.renderNetworkTab();
         break;
       case 'language':
         content.innerHTML = this.renderLanguageTab();
@@ -451,6 +455,50 @@ export class SettingsModal {
     `;
   }
 
+  renderNetworkTab() {
+    const net = this.game.network;
+    const nick = net ? net.nickname : (localStorage.getItem('lumen_net_nickname') || 'Lumi');
+    const srv = localStorage.getItem('lumen_net_server') || 'ws://localhost:3000';
+    return `
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">Player Nickname</div>
+          <div class="setting-desc">Visible to celestial teammates in co-op expeditions</div>
+        </div>
+        <input type="text" id="set-netNickname" value="${nick}" maxlength="16" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,217,138,0.3); color: #ffd98a; padding: 4px 8px; border-radius: 4px;" />
+      </div>
+
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">Relay Server URL</div>
+          <div class="setting-desc">WebSocket address for multiplayer party coordination</div>
+        </div>
+        <input type="text" id="set-netServerUrl" value="${srv}" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; width: 180px;" />
+      </div>
+
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">Connection Diagnostic</div>
+          <div class="setting-desc" id="net-ping-status">Server status: ready to test</div>
+        </div>
+        <button class="menu-btn secondary-btn" id="btn-test-server" style="padding: 4px 10px; font-size: 0.75rem;">Test Ping</button>
+      </div>
+
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">Loopback Lag Simulator</div>
+          <div class="setting-desc">Simulate artificial network latency for test and debugging</div>
+        </div>
+        <select id="set-netLagSim">
+          <option value="0">0 ms (Offline / Ideal)</option>
+          <option value="40">40 ms (Broadband)</option>
+          <option value="120">120 ms (Cross-Region)</option>
+          <option value="250">250 ms (High Latency)</option>
+        </select>
+      </div>
+    `;
+  }
+
   renderLanguageTab() {
     return `
       <div class="setting-item">
@@ -547,6 +595,59 @@ export class SettingsModal {
     if (testAudioBtn && this.game && this.game.audio) {
       testAudioBtn.addEventListener('click', () => {
         this.game.audio.playAudioTest();
+      });
+    }
+
+    // Network inputs
+    const nickInput = container.querySelector('#set-netNickname');
+    if (nickInput) {
+      nickInput.addEventListener('change', (e) => {
+        const val = e.target.value.trim() || 'Lumi';
+        localStorage.setItem('lumen_net_nickname', val);
+        if (this.game.network) this.game.network.nickname = val;
+        this.menuManager.showToast('Nickname saved');
+      });
+    }
+
+    const srvInput = container.querySelector('#set-netServerUrl');
+    if (srvInput) {
+      srvInput.addEventListener('change', (e) => {
+        const val = e.target.value.trim() || 'ws://localhost:3000';
+        localStorage.setItem('lumen_net_server', val);
+        this.menuManager.showToast('Server URL saved');
+      });
+    }
+
+    const testSrvBtn = container.querySelector('#btn-test-server');
+    const pingStatus = container.querySelector('#net-ping-status');
+    if (testSrvBtn && pingStatus) {
+      testSrvBtn.addEventListener('click', async () => {
+        pingStatus.textContent = 'Connecting to server...';
+        const start = performance.now();
+        try {
+          const res = await fetch('http://localhost:3000/health');
+          const data = await res.json();
+          const latency = Math.round(performance.now() - start);
+          pingStatus.textContent = `Online (${latency} ms) - Active Rooms: ${data.activeRooms}`;
+          pingStatus.style.color = '#73d13d';
+        } catch (e) {
+          pingStatus.textContent = 'Offline / Cannot connect to server';
+          pingStatus.style.color = '#ff4d4f';
+        }
+      });
+    }
+
+    const lagSim = container.querySelector('#set-netLagSim');
+    if (lagSim && this.game.network) {
+      lagSim.addEventListener('change', (e) => {
+        const ms = parseInt(e.target.value, 10);
+        if (ms > 0) {
+          this.game.network.enableLoopback(ms, ms * 0.2, 0);
+          this.menuManager.showToast(`Lag simulator: ${ms}ms`);
+        } else {
+          this.game.network.setOffline();
+          this.menuManager.showToast('Single-player offline mode');
+        }
       });
     }
 

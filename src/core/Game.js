@@ -49,6 +49,19 @@ import { SettingsModal } from '../ui/settings/SettingsModal.js';
 import { ControlsRebindModal } from '../ui/settings/ControlsRebindModal.js';
 import { PauseMenu } from '../ui/menus/PauseMenu.js';
 
+// Multiplayer Subsystems
+import { NetworkSession } from '../net/NetworkSession.js';
+import { PlayerManager } from '../net/PlayerManager.js';
+import { GlobalNetEvents } from '../net/NetworkEventBus.js';
+import { ClientPrediction } from '../net/Prediction.js';
+import { SnapshotInterpolator } from '../net/Interpolation.js';
+import { PartyLobbyModal } from '../ui/party/PartyLobbyModal.js';
+import { PartyHUD } from '../ui/party/PartyHUD.js';
+import { PingWheel } from '../ui/party/PingWheel.js';
+import { ChatBox } from '../ui/party/ChatBox.js';
+import { NET_MESSAGE_TYPES, COOP_CONFIG } from '../../shared/protocol.js';
+import { InputFrame } from '../net/InputFrame.js';
+
 // Backward compatibility alias
 export const GAME_STATES = {
   MENU: 'MAIN_MENU',
@@ -100,6 +113,15 @@ export class Game {
     this.shadowArmy = new ShadowArmyManager();
     this.moonLedger = new MoonLedger();
     this.combat.summonSystem = this.summons;
+
+    // Multiplayer Subsystems
+    this.network = new NetworkSession(this);
+    this.playerManager = new PlayerManager(this);
+    this.partyHUD = new PartyHUD(this);
+    this.pingWheel = new PingWheel(this);
+    this.chatBox = new ChatBox(this);
+    this.prediction = null;
+    this.interpolator = new SnapshotInterpolator(100);
 
     // Menu and Scene Subsystems
     this.menuManager = new MenuManager(this);
@@ -348,6 +370,10 @@ export class Game {
     this.menuManager.pushModal(new WelcomeModal(this.menuManager, this).create());
   }
 
+  openPartyModal() {
+    this.menuManager.pushModal(new PartyLobbyModal(this.menuManager, this).create());
+  }
+
   startSlotGame(slot) {
     this.menuManager.clearModals();
     this.mainMenu.unmount();
@@ -368,6 +394,13 @@ export class Game {
 
     this.player = new Player(this.tileMap.playerStart.x, this.tileMap.playerStart.y);
     this.player.setSpawn(this.tileMap.playerStart.x, this.tileMap.playerStart.y);
+
+    if (this.playerManager) {
+      this.playerManager.spawnPlayers(this.tileMap);
+      this.player = this.playerManager.getLocalPlayer() || this.player;
+      this.tileMap.playerManager = this.playerManager;
+    }
+    this.prediction = new ClientPrediction(this.player);
 
     this.firefly = new FireflyCompanion(this.player.x, this.player.y);
 
@@ -534,7 +567,22 @@ export class Game {
 
     // 2. In-Game State (PLAYING)
     this.stageElapsed += dt;
-    // (input.update already called at top of update())
+
+    // Multiplayer Session & Input Frame Sampling
+    if (this.network && this.network.isMultiplayer) {
+      this.network.tick++;
+      const frame = InputFrame.encode(this.input, this.network.inputSeq++, this.network.tick);
+      if (!this.network.isHost) {
+        this.network.send({
+          type: NET_MESSAGE_TYPES.INPUT_FRAME,
+          frame
+        });
+        if (this.prediction) {
+          this.prediction.recordInput(frame.seq, frame.tick, frame);
+          this.prediction.updateSmoothing();
+        }
+      }
+    }
 
     // Check Pause
     if (this.input.actions.pauseJustPressed) {
@@ -746,14 +794,108 @@ export class Game {
       }
     }
 
-    // Update VFX & Camera
+    // Update VFX & Subsystems
     this.vfx.update(dt);
-    this.camera.update(
-      this.player.x + this.player.width / 2,
-      this.player.y + this.player.height / 2,
-      this.player.facing,
-      dt
-    );
+    if (this.playerManager) this.playerManager.update(effectiveDt, this.input);
+    if (this.pingWheel) this.pingWheel.update(dt);
+    if (this.chatBox) this.chatBox.update(dt);
+
+    // Co-op all downed check -> checkpoint respawn
+    if (this.playerManager && this.playerManager.players.size > 1 && this.playerManager.areAllPlayersDowned()) {
+      this.restartFromCheckpoint();
+      for (const info of this.playerManager.players.values()) {
+        if (info.playerEntity) {
+          this.playerManager.revivePlayer(info.playerEntity);
+        }
+      }
+    }
+
+    // Shared Camera Tracking Centroid of Living Players
+    let camTargetX = this.player.x + this.player.width / 2;
+    let camTargetY = this.player.y + this.player.height / 2;
+    if (this.playerManager && this.playerManager.players.size > 1) {
+      const living = this.playerManager.getLivingPlayers();
+      if (living.length > 0) {
+        let sumX = 0, sumY = 0;
+        for (const p of living) {
+          sumX += p.x + p.width / 2;
+          sumY += p.y + p.height / 2;
+        }
+        camTargetX = sumX / living.length;
+        camTargetY = sumY / living.length;
+      }
+    }
+    this.camera.update(camTargetX, camTargetY, this.player.facing, dt);
+
+    // Host Snapshot Broadcast (20 Hz) or Client Snapshot Interpolation
+    if (this.network && this.network.isMultiplayer) {
+      if (this.network.isHost && (this.network.tick % 3 === 0)) {
+        const snapshot = {
+          tick: this.network.tick,
+          players: this.playerManager.getAllPlayerInfos().map(info => ({
+            id: info.id,
+            slot: info.slot,
+            nickname: info.nickname,
+            paletteId: info.palette ? info.palette.id : 0,
+            x: info.playerEntity ? info.playerEntity.x : 0,
+            y: info.playerEntity ? info.playerEntity.y : 0,
+            vx: info.playerEntity ? info.playerEntity.vx : 0,
+            vy: info.playerEntity ? info.playerEntity.vy : 0,
+            facing: info.playerEntity ? info.playerEntity.facing : 1,
+            health: info.playerEntity ? info.playerEntity.energy : 100,
+            energy: info.playerEntity ? info.playerEntity.energy : 100,
+            isDowned: info.playerEntity ? !!info.playerEntity.isDowned : false,
+            reviveProgress: info.reviveProgress || 0
+          })),
+          enemies: this.tileMap.getAllEnemies().map(e => ({
+            id: e.id || (e.x + '_' + e.y),
+            type: e.type,
+            x: e.x,
+            y: e.y,
+            vx: e.vx || 0,
+            vy: e.vy || 0,
+            health: e.health,
+            facing: e.facing || 1,
+            state: e.state
+          })),
+          boss: this.tileMap.boss ? {
+            x: this.tileMap.boss.x,
+            y: this.tileMap.boss.y,
+            health: this.tileMap.boss.health,
+            maxHealth: this.tileMap.boss.maxHealth,
+            phase: this.tileMap.boss.phase,
+            state: this.tileMap.boss.state,
+            facing: this.tileMap.boss.facing
+          } : null
+        };
+        this.network.send({
+          type: NET_MESSAGE_TYPES.SNAPSHOT,
+          snapshot
+        });
+      } else if (!this.network.isHost && this.network.latestSnapshot) {
+        this.interpolator.pushSnapshot(this.network.latestSnapshot);
+        const interp = this.interpolator.getInterpolatedState();
+        if (interp && interp.players) {
+          for (const sp of interp.players) {
+            if (sp.id !== this.network.playerId) {
+              const remoteInfo = this.playerManager.players.get(sp.id);
+              if (remoteInfo && remoteInfo.playerEntity) {
+                const rp = remoteInfo.playerEntity;
+                rp.x = sp.x;
+                rp.y = sp.y;
+                rp.vx = sp.vx;
+                rp.vy = sp.vy;
+                rp.facing = sp.facing;
+                rp.energy = sp.energy;
+                rp.isDowned = sp.isDowned;
+                remoteInfo.reviveProgress = sp.reviveProgress;
+                remoteInfo.state = sp.isDowned ? 'DOWNED' : 'ALIVE';
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Update Particles
     if (this.accessibility.highQuality !== false || Math.random() < 0.6) {
@@ -886,6 +1028,14 @@ export class Game {
       }
 
       this.player.render(ctx);
+      // Render Co-Op Teammates
+      if (this.playerManager) {
+        for (const p of this.playerManager.getAllPlayers()) {
+          if (p !== this.player && !p.isDowned) {
+            p.render(ctx);
+          }
+        }
+      }
       this.firefly.render(ctx);
 
       // Finale Orbiting Shards
@@ -911,6 +1061,12 @@ export class Game {
       }
 
       this.particles.render(ctx, this.camera);
+      if (this.playerManager) {
+        this.playerManager.renderWispsAndNames(ctx, this.camera);
+      }
+      if (this.pingWheel) {
+        this.pingWheel.render(ctx);
+      }
 
       // Screen Flashes
       this.vfx.renderScreenOverlay(ctx, GAME_WIDTH, GAME_HEIGHT, this.accessibility.flashIntensity);
@@ -936,6 +1092,9 @@ export class Game {
       this.summons.renderWheel(ctx, GAME_WIDTH, GAME_HEIGHT, this.combat.soulEnergy);
       this.skills.renderMenu(ctx, GAME_WIDTH, GAME_HEIGHT);
       this.moonLedger.render(ctx);
+      if (this.partyHUD) {
+        this.partyHUD.render(ctx);
+      }
     }
 
     // Show FPS Counter

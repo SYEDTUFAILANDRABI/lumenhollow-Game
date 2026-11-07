@@ -45,6 +45,10 @@ export class Player {
     this.spawnX = x;
     this.spawnY = y;
     this.isDead = false;
+    this.isDowned = false;
+    this.onDowned = null;
+    this.palette = null;
+    this.networkSlot = 0;
     this.deathTimer = 0;
     this.invulnerableTimer = 0;
 
@@ -114,7 +118,16 @@ export class Player {
   }
 
   die(particleSystem, camera, audioSystem) {
-    if (this.isDead || this.invulnerableTimer > 0 || this.isDashing) return;
+    if (this.isDead || this.invulnerableTimer > 0 || this.isDashing || this.isDowned) return;
+    if (this.onDowned && this.onDowned()) {
+      this.isDowned = true;
+      if (camera) camera.shake(3, 0.2);
+      if (audioSystem) audioSystem.playDissolve();
+      if (particleSystem) {
+        particleSystem.emitDeathBurst(this.x + this.width / 2, this.y + this.height / 2);
+      }
+      return;
+    }
     this.isDead = true;
     this.deathTimer = 0.55;
     this.isSlashing = false;
@@ -146,6 +159,10 @@ export class Player {
   }
 
   update(input, tileMap, particleSystem, audioSystem, camera, combatSystem, vfx, enemies, boss, dt, shardUpgrades = {}) {
+    if (this.isDowned) {
+      return;
+    }
+
     if (this.sprite) {
       this.sprite.update(dt, this);
     }
@@ -777,6 +794,7 @@ export class Player {
   }
 
   render(ctx) {
+    if (this.isDowned) return;
     if (this.isDead && (!this.sprite || this.sprite.currentAnim !== 'death')) return;
 
     if (this.invulnerableTimer > 0 && Math.floor(Date.now() / 80) % 2 === 0) {
@@ -818,7 +836,8 @@ export class Player {
     ctx.fill();
 
     // 3. Cloak Hem Accent & Astral Glowing Outline
-    ctx.strokeStyle = this.isAstralForm ? '#bb44ff' : (this.isEclipseForm ? '#ff2255' : '#2a9d8f');
+    const cloakAccent = this.palette ? this.palette.cloak : '#2a9d8f';
+    ctx.strokeStyle = this.isAstralForm ? '#bb44ff' : (this.isEclipseForm ? '#ff2255' : cloakAccent);
     ctx.lineWidth = this.isAstralForm ? 2.0 : 1.2;
     ctx.beginPath();
     ctx.moveTo(-6 + Math.sin(this.cloakSway) * 2, -1);
@@ -900,8 +919,9 @@ export class Player {
       glowGrad.addColorStop(0.4, '#ff2255');
       glowGrad.addColorStop(1, '#881144');
     } else {
+      const lanternColor = this.palette ? this.palette.lantern : '#ffd98a';
       glowGrad.addColorStop(0, '#ffffff');
-      glowGrad.addColorStop(0.4, '#ffd98a');
+      glowGrad.addColorStop(0.4, lanternColor);
       glowGrad.addColorStop(1, '#ff8fab');
     }
     ctx.fillStyle = glowGrad;

@@ -181,8 +181,19 @@ export class TileMap {
   }
 
   updateEntities(player, particleSystem, audioSystem, camera, onShardCollect, dt, combatSystem, vfx, shardUpgrades) {
+    const playersToCheck = (this.playerManager && this.playerManager.players.size > 1) 
+      ? this.playerManager.getLivingPlayers() 
+      : [player];
+
+    const getTarget = (x, y) => {
+      if (this.playerManager && this.playerManager.players.size > 1) {
+        return this.playerManager.getNearestLivingPlayer(x, y);
+      }
+      return player;
+    };
+
     // 1. Moon-glass platforms
-    const lPos = player.getLanternWorldPos();
+    const lPos = player.getLanternWorldPos ? player.getLanternWorldPos() : { x: player.x, y: player.y };
     for (const mg of this.moonGlassPlatforms) {
       mg.update(player.currentLightRadius, lPos, dt);
     }
@@ -190,25 +201,31 @@ export class TileMap {
     // 1b. Moving platforms carrying player
     for (const mp of this.movingPlatforms) {
       mp.update(dt);
-      if (mp.checkPlayerStanding(player)) {
-        player.y = mp.y - player.height;
-        player.x += mp.deltaX;
-        player.y += mp.deltaY;
-        player.isGrounded = true;
-        player.vy = 0;
-        player.canDoubleJump = true;
-        player.airDashAvailable = true;
+      for (const p of playersToCheck) {
+        if (mp.checkPlayerStanding(p)) {
+          p.y = mp.y - p.height;
+          p.x += mp.deltaX;
+          p.y += mp.deltaY;
+          p.isGrounded = true;
+          p.vy = 0;
+          p.canDoubleJump = true;
+          p.airDashAvailable = true;
+        }
       }
     }
 
     // 2. Shrines
     for (const shrine of this.shrines) {
-      shrine.update(player, particleSystem, audioSystem, dt);
+      for (const p of playersToCheck) {
+        shrine.update(p, particleSystem, audioSystem, dt);
+      }
     }
 
     // 3. Moon Shards
     for (const shard of this.shards) {
-      shard.update(player, particleSystem, audioSystem, onShardCollect, dt);
+      for (const p of playersToCheck) {
+        shard.update(p, particleSystem, audioSystem, onShardCollect, dt);
+      }
     }
 
     // 4. Wild Fireflies
@@ -216,9 +233,9 @@ export class TileMap {
       ff.update(player, particleSystem, audioSystem, dt);
     }
 
-    // 5. Enemies update
+    // 5. Enemies update (Target nearest co-op living player)
     for (const wisp of this.wisps) {
-      wisp.update(player, particleSystem, audioSystem, dt);
+      wisp.update(getTarget(wisp.x, wisp.y), particleSystem, audioSystem, dt);
     }
 
     for (const dummy of this.dummies) {
@@ -226,35 +243,35 @@ export class TileMap {
     }
 
     for (const knight of this.knights) {
-      knight.update(player, particleSystem, audioSystem, dt);
+      knight.update(getTarget(knight.x, knight.y), particleSystem, audioSystem, dt);
     }
 
     for (const crow of this.crows) {
-      crow.update(player, particleSystem, audioSystem, dt);
+      crow.update(getTarget(crow.x, crow.y), particleSystem, audioSystem, dt);
     }
 
     for (const skel of this.skeletons) {
-      skel.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      skel.update(getTarget(skel.x, skel.y), combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     for (const arch of this.archers) {
-      arch.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      arch.update(getTarget(arch.x, arch.y), combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     for (const bk of this.boneKnights) {
-      bk.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      bk.update(getTarget(bk.x, bk.y), combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     for (const imp of this.fireImps) {
-      imp.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      imp.update(getTarget(imp.x, imp.y), combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     for (const brute of this.hornedBrutes) {
-      brute.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      brute.update(getTarget(brute.x, brute.y), combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     for (const caster of this.hellCasters) {
-      caster.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      caster.update(getTarget(caster.x, caster.y), combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     // Spawn Soul Markers on Enemy & Boss Death
@@ -267,6 +284,7 @@ export class TileMap {
     }
     if (this.boss && this.boss.isDead && !this.boss.soulSpawned && this.boss.tier !== 'ABYSS_SOVEREIGN') {
       this.boss.soulSpawned = true;
+      this.boss.soulSpawned = true;
       this.soulMarkers.push(new SoulMarker(this.boss.x, this.boss.y, this.boss.name, this.boss.tier, this.boss.name));
     }
 
@@ -278,9 +296,10 @@ export class TileMap {
       }
     }
 
-    // 6. Boss update
+    // 6. Boss update (Target nearest co-op living player)
     if (this.boss) {
-      this.boss.update(player, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
+      const bossTarget = getTarget(this.boss.x, this.boss.y);
+      this.boss.update(bossTarget, combatSystem, vfx, particleSystem, audioSystem, camera, dt);
     }
 
     // Dynamic Skeleton Uprisings from beneath
