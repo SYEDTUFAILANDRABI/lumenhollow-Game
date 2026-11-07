@@ -11,16 +11,15 @@ export class PartyLobbyModal {
 
   create() {
     const el = document.createElement('div');
-    el.className = 'party-lobby-modal';
+    el.className = 'menu-modal-backdrop party-lobby-modal active';
     el.innerHTML = `
-      <div class="party-modal-backdrop"></div>
       <div class="party-modal-panel">
         <div class="party-header">
           <div class="party-title">
             <span class="party-icon">👥</span>
             <h2>CELESTIAL EXPEDITION</h2>
           </div>
-          <button class="party-close-btn" id="party-close" aria-label="Close">✕</button>
+          <button class="menu-close-btn party-close-btn" id="party-close" aria-label="Close">✕</button>
         </div>
 
         <div class="party-body">
@@ -28,7 +27,7 @@ export class PartyLobbyModal {
           <div class="party-room-bar" id="party-room-bar">
             <div class="room-info">
               <span class="room-label">ROOM CODE:</span>
-              <span class="room-code-badge" id="party-code-val">${this.net && this.net.roomCode ? this.net.roomCode : 'OFFLINE'}</span>
+              <span class="room-code-badge" id="party-code-val">${this.net && this.net.roomCode ? this.net.roomCode : 'STANDALONE'}</span>
               <button class="copy-link-btn" id="party-copy-link" title="Copy Invite Link">📋 Copy Link</button>
             </div>
             <div class="room-mode-tag" id="party-mode-tag">
@@ -56,8 +55,8 @@ export class PartyLobbyModal {
         <div class="party-footer">
           <button class="menu-btn back-btn" id="party-leave-btn">LEAVE PARTY</button>
           <div class="footer-spacer"></div>
-          <button class="menu-btn toggle-ready-btn" id="party-ready-btn">TOGGLE READY</button>
-          <button class="menu-btn start-expedition-btn" id="party-start-btn" disabled>START EXPEDITION</button>
+          <button class="menu-btn toggle-ready-btn" id="party-ready-btn">READY UP</button>
+          <button class="menu-btn start-expedition-btn" id="party-start-btn">START EXPEDITION</button>
         </div>
       </div>
     `;
@@ -66,10 +65,20 @@ export class PartyLobbyModal {
     this.bindEvents(el);
     this.refreshSlots(el);
 
+    // Auto-connect to relay server if available
+    if (this.net && !this.net.isMultiplayer) {
+      try {
+        this.net.connectToServer();
+      } catch (e) {
+        // Fallback silently to offline mode
+      }
+    }
+
     // Subscribe to network room updates
     if (this.net) {
       this.net.onRoomUpdate = () => {
         this.refreshSlots(el);
+        if (this.menuManager) this.menuManager.updateFocusables();
       };
       this.net.onGameStart = () => {
         this.menuManager.clearModals();
@@ -93,7 +102,7 @@ export class PartyLobbyModal {
       ? this.net.roomData.members
       : [{
           id: this.net ? this.net.playerId : 'local',
-          nickname: this.net ? this.net.nickname : 'Lumi',
+          nickname: this.net ? this.net.nickname : (localStorage.getItem('lumen_net_nickname') || 'Lumi'),
           paletteId: this.net ? this.net.paletteId : 0,
           isHost: true,
           ready: true
@@ -114,7 +123,7 @@ export class PartyLobbyModal {
       if (member) {
         if (!member.ready) allReady = false;
         const pal = PLAYER_PALETTES[(member.paletteId || 0) % PLAYER_PALETTES.length];
-        const isSelf = this.net && member.id === this.net.playerId;
+        const isSelf = this.net ? member.id === this.net.playerId : slot === 0;
 
         slotCard.innerHTML = `
           <div class="slot-avatar-wrap">
@@ -135,7 +144,7 @@ export class PartyLobbyModal {
           ${isSelf ? `
             <div class="palette-picker-row">
               ${PLAYER_PALETTES.map((p, pIdx) => `
-                <button class="palette-dot ${pIdx === member.paletteId ? 'active' : ''}" 
+                <button class="palette-dot ${pIdx === (member.paletteId || 0) ? 'active' : ''}" 
                         style="background: ${p.cloak};" 
                         title="${p.name}" 
                         data-palette="${pIdx}"></button>
@@ -148,16 +157,22 @@ export class PartyLobbyModal {
           const nameInput = slotCard.querySelector('.slot-name-input');
           if (nameInput) {
             nameInput.addEventListener('change', (e) => {
-              this.net.nickname = e.target.value.trim().substring(0, 14) || 'Lumi';
-              localStorage.setItem('lumen_net_nickname', this.net.nickname);
+              const val = e.target.value.trim().substring(0, 14) || 'Lumi';
+              if (this.net) this.net.nickname = val;
+              localStorage.setItem('lumen_net_nickname', val);
             });
           }
 
           slotCard.querySelectorAll('.palette-dot').forEach(dot => {
             dot.addEventListener('click', () => {
+              this.menuManager.playClickSound();
               const pId = parseInt(dot.getAttribute('data-palette'), 10);
-              this.net.paletteId = pId;
+              if (this.net) this.net.paletteId = pId;
               localStorage.setItem('lumen_net_palette', pId.toString());
+              if (this.net && this.net.roomData && this.net.roomData.members) {
+                const selfMember = this.net.roomData.members.find(m => m.id === this.net.playerId);
+                if (selfMember) selfMember.paletteId = pId;
+              }
               this.refreshSlots(rootEl);
             });
           });
@@ -177,13 +192,14 @@ export class PartyLobbyModal {
     if (startBtn) {
       const isHost = this.net ? this.net.isHost : true;
       startBtn.style.display = isHost ? 'inline-block' : 'none';
-      startBtn.disabled = !allReady || (this.net && this.net.isMultiplayer && members.length < 2);
+      startBtn.disabled = !allReady;
     }
 
     if (readyBtn && this.net) {
-      const myInfo = members.find(m => m.id === this.net.playerId);
-      readyBtn.textContent = (myInfo && myInfo.ready) ? 'CANCEL READY' : 'READY UP';
-      readyBtn.className = `menu-btn toggle-ready-btn ${(myInfo && myInfo.ready) ? 'is-ready' : ''}`;
+      const myInfo = members.find(m => m.id === this.net.playerId) || members[0];
+      const isReady = myInfo ? myInfo.ready : false;
+      readyBtn.textContent = isReady ? 'CANCEL READY' : 'READY UP';
+      readyBtn.className = `menu-btn toggle-ready-btn ${isReady ? 'is-ready' : ''}`;
     }
   }
 
@@ -198,15 +214,32 @@ export class PartyLobbyModal {
     const joinBtn = rootEl.querySelector('#party-join-btn');
     const joinInput = rootEl.querySelector('#party-join-code-input');
 
-    closeBtn?.addEventListener('click', () => this.menuManager.clearModals());
+    // Click outside window to close
+    rootEl.addEventListener('click', (e) => {
+      if (e.target === rootEl) {
+        this.menuManager.playClickSound();
+        this.menuManager.clearModals();
+      }
+    });
+
+    closeBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
+      this.menuManager.clearModals();
+    });
+
     leaveBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       if (this.net) this.net.setOffline();
       this.menuManager.clearModals();
     });
 
     copyLinkBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       const code = this.net && this.net.roomCode ? this.net.roomCode : '';
-      if (!code) return;
+      if (!code) {
+        this.menuManager.showToast('Create or join a room first', '⚠️');
+        return;
+      }
       const url = `${window.location.origin}${window.location.pathname}?room=${code}`;
       navigator.clipboard?.writeText(url).then(() => {
         this.menuManager.showToast('Invite link copied!', '📋');
@@ -214,14 +247,17 @@ export class PartyLobbyModal {
     });
 
     createBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       if (!this.net) return;
       this.net.connectToServer();
       setTimeout(() => {
         this.net.createRoom('duo', false);
-      }, 250);
+      }, 150);
+      this.menuManager.showToast('Creating expedition room...', '➕');
     });
 
     joinBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       const code = joinInput?.value.trim().toUpperCase();
       if (!code || code.length < 4) {
         this.menuManager.showToast('Please enter a valid room code', '⚠️');
@@ -231,34 +267,50 @@ export class PartyLobbyModal {
       this.net.connectToServer();
       setTimeout(() => {
         this.net.joinRoom(code);
-      }, 250);
+      }, 150);
+      this.menuManager.showToast(`Joining room ${code}...`, '🚪');
     });
 
     quickMatchBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       if (!this.net) return;
       this.menuManager.showToast('Searching for celestial allies...', '⚡');
       this.net.connectToServer();
       setTimeout(() => {
         this.net.matchmake('duo');
-      }, 250);
+      }, 150);
     });
 
     readyBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       if (!this.net) return;
-      const members = this.net.roomData?.members || [];
-      const myInfo = members.find(m => m.id === this.net.playerId);
-      const isReady = myInfo ? !myInfo.ready : true;
-      this.net.setReady(isReady);
+      if (this.net.isMultiplayer) {
+        const members = this.net.roomData?.members || [];
+        const myInfo = members.find(m => m.id === this.net.playerId);
+        const isReady = myInfo ? !myInfo.ready : true;
+        this.net.setReady(isReady);
+      } else {
+        const members = this.net.roomData?.members;
+        if (members && members[0]) {
+          members[0].ready = !members[0].ready;
+          this.refreshSlots(rootEl);
+        }
+      }
     });
 
     startBtn?.addEventListener('click', () => {
+      this.menuManager.playClickSound();
       if (!this.net) return;
-      if (this.net.isMultiplayer) {
+      if (this.net.isMultiplayer && this.net.roomCode) {
         this.net.startGame();
       } else {
         this.menuManager.clearModals();
         this.game.startSlotGame(this.game.saves ? this.game.saves.getActiveSlot() : null);
       }
+    });
+
+    rootEl.querySelectorAll('button').forEach(b => {
+      b.addEventListener('mouseenter', () => this.menuManager.playHoverSound());
     });
   }
 
@@ -275,15 +327,14 @@ export class PartyLobbyModal {
         align-items: center;
         justify-content: center;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      }
-      .party-modal-backdrop {
-        position: absolute;
-        inset: 0;
+        pointer-events: auto !important;
         background: rgba(9, 8, 20, 0.88);
         backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
       }
       .party-modal-panel {
         position: relative;
+        z-index: 100;
         width: 680px;
         max-width: 92vw;
         background: linear-gradient(180deg, #18152c 0%, #0d0b1a 100%);
@@ -294,6 +345,15 @@ export class PartyLobbyModal {
         flex-direction: column;
         overflow: hidden;
         color: #f0e6df;
+        pointer-events: auto !important;
+      }
+      .party-modal-panel button,
+      .party-modal-panel input {
+        pointer-events: auto !important;
+        cursor: pointer;
+      }
+      .party-modal-panel input[type="text"] {
+        cursor: text;
       }
       .party-header {
         padding: 18px 24px;
@@ -321,6 +381,7 @@ export class PartyLobbyModal {
         font-size: 1.2rem;
         cursor: pointer;
         transition: color 0.2s;
+        padding: 4px 8px;
       }
       .party-close-btn:hover { color: #ffd98a; }
       .party-body {
@@ -533,6 +594,7 @@ export class PartyLobbyModal {
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        pointer-events: auto !important;
       }
       .menu-btn:hover:not(:disabled) {
         background: rgba(255, 217, 138, 0.25);
